@@ -190,6 +190,22 @@ select.seg.need{border-color:var(--danger);background:#fff3f1}
 .full .ac button{border:0;background:transparent;font-size:12.5px;font-weight:700;padding:5px 8px;border-radius:9px;color:inherit}
 .full .ac .del{color:var(--danger)}
 .reg{font-size:11px;font-weight:700;margin-right:6px}
+.g3{display:grid;grid-template-columns:1fr 1fr 112px;gap:10px}
+@media(max-width:520px){.g3{grid-template-columns:1fr 112px}.g3>:first-child{grid-column:1/-1}}
+.jcalc{margin-top:8px;border:1px solid var(--line);border-radius:11px;overflow:hidden;font-size:12.5px}
+.jc{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:7px 10px;background:var(--soft);align-items:center}
+.jc + .jc{border-top:1px solid var(--line)}
+.jc .a{color:var(--muted);word-break:break-word} .jc .a b{color:var(--ink)}
+.jc .v{grid-column:2;grid-row:1 / span 2;text-align:right;font-weight:800;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px}
+.jc .v small{display:block;font-family:system-ui,sans-serif;font-weight:700;font-size:11px;color:var(--muted)}
+.ln + .ln{margin-top:12px;padding-top:10px;border-top:1px dashed var(--line)}
+.ln .nom{flex:0 1 135px;min-width:100px;padding:7px 10px;font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:700}
+.ln .rm{border:0;background:transparent;color:var(--danger);font-weight:800;padding:6px 9px;border-radius:9px}
+.tfoot{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px}
+.tfoot .sp{flex:1}
+.tfoot .link{padding:4px 2px}
+.sisa{font-size:12.5px;font-weight:700;color:var(--warn)} .sisa.ok{color:var(--in-fg)}
+.full .ac .addk{background:var(--brand);color:#fff;padding:5px 11px;margin-right:4px}
 .note{font-size:12.5px;color:var(--muted);margin-top:10px}
 .bar{height:8px;background:var(--soft);border-radius:99px;overflow:hidden;margin-top:12px}
 .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--brand),var(--accent));transition:width .2s}
@@ -267,8 +283,9 @@ select.seg.need{border-color:var(--danger);background:#fff3f1}
         <div class="csv-actions">
           <button id="btnCsv" class="btn primary" type="button">⬆ Impor CSV</button>
           <button id="btnCsvExport" class="btn" type="button">⬇ Ekspor hasil</button>
+          <button id="btnCsvHist" class="btn" type="button">🕘 Riwayat</button>
         </div>
-        <input id="csvFile" type="file" accept=".csv,text/csv,.txt" class="hidden">
+        <input id="csvFile" type="file" accept=".csv,text/csv,.txt" multiple class="hidden">
       </div>
       <div class="csv-tools">
         <input id="cq" class="inp" type="search" placeholder="Cari keterangan atau kode…" autocomplete="off">
@@ -304,12 +321,9 @@ select.seg.need{border-color:var(--danger);background:#fff3f1}
   </div>
   <label class="f" for="fKontak">Nama Kontak</label><input id="fKontak" class="inp" placeholder="Nama kontak (isi - jika tidak ada)">
   <label class="f" for="fKet">Keterangan</label><textarea id="fKet" class="inp"></textarea>
-  <div class="g2">
-    <div><label class="f" for="fD1">Debit 1</label><input id="fD1" class="inp" list="dlAkun"></div>
-    <div><label class="f" for="fK1">Kredit 1</label><input id="fK1" class="inp" list="dlAkun"></div>
-    <div><label class="f" for="fD2">Debit 2</label><input id="fD2" class="inp" list="dlAkun"></div>
-    <div><label class="f" for="fK2">Kredit 2</label><input id="fK2" class="inp" list="dlAkun"></div>
-  </div>
+  <div id="jPairs"></div>
+  <div id="pctSum" class="note"></div>
+  <button id="fAddJ" class="link" type="button" style="margin-top:6px">＋ Tambah Debit 3 / Kredit 3</button>
   <datalist id="dlDana"></datalist><datalist id="dlAkun"></datalist>
   <div id="formMsg" class="msg"></div>
   <div class="foot"><button id="fCancel" class="btn" type="button">Batal</button><button id="fSave" class="btn primary" type="button">Simpan</button></div>
@@ -341,6 +355,13 @@ select.seg.need{border-color:var(--danger);background:#fff3f1}
 </div></div>
 
 <!-- ===== Modal riwayat impor ===== -->
+<div id="ovCsvHist" class="ov hidden"><div class="sheet">
+  <h2>Riwayat Impor CSV</h2>
+  <p class="sub">Menghapus sebuah impor akan ikut menghapus <b>semua transaksi</b> yang berasal dari file tersebut, termasuk kode final yang sudah dipilih.</p>
+  <div id="csvHistList"></div>
+  <div class="foot"><button id="csvHistClose" class="btn" type="button">Tutup</button></div>
+</div></div>
+
 <div id="ovHist" class="ov hidden"><div class="sheet">
   <h2>Riwayat Impor</h2>
   <p class="sub">Menghapus sebuah impor akan ikut menghapus semua kode yang berasal dari impor tersebut.</p>
@@ -377,8 +398,38 @@ try {
 
 /* ================= Util ================= */
 const $ = s => document.querySelector(s);
-const FIELDS = ['dana','kontak','kode','keterangan','debit1','kredit1','debit2','kredit2'];
-const LABEL = { dana:'Dana', kontak:'Nama Kontak', kode:'Kode Transaksi', keterangan:'Keterangan', debit1:'Debit 1', kredit1:'Kredit 1', debit2:'Debit 2', kredit2:'Kredit 2' };
+const JN = 10;                                  // jumlah maksimum pasangan Debit/Kredit
+const JPAIRS = Array.from({ length: JN }, (_, i) => i + 1);
+const FIELDS = ['dana','kontak','kode','keterangan', ...JPAIRS.flatMap(n => ['debit' + n, 'kredit' + n, 'persen' + n])];
+const LABEL = { dana:'Dana', kontak:'Nama Kontak', kode:'Kode Transaksi', keterangan:'Keterangan' };
+JPAIRS.forEach(n => { LABEL['debit' + n] = 'Debit ' + n; LABEL['kredit' + n] = 'Kredit ' + n; LABEL['persen' + n] = 'Persen ' + n; });
+const jAll = r => JPAIRS.flatMap(n => [r['debit' + n], r['kredit' + n]]);
+// Isian kolom "% / nominal": "25%" = persentase; "1jt", "500rb", "1.000.000" = nominal rupiah; angka polos <= 100 dianggap persentase
+function numFromText(x, allowThousands) {
+  if (allowThousands && /^\d{1,3}([.,]\d{3})+$/.test(x)) return parseFloat(x.replace(/[.,]/g, ''));
+  const lc = x.lastIndexOf(','), ld = x.lastIndexOf('.');
+  if (lc >= 0 && ld >= 0) x = lc > ld ? x.replace(/\./g, '').replace(',', '.') : x.replace(/,/g, '');
+  else if (lc >= 0) { if (x.split(',').length > 2) return NaN; x = x.replace(',', '.'); }
+  else if (ld >= 0 && x.split('.').length > 2) return NaN;
+  return /^\d+(\.\d+)?$/.test(x) ? parseFloat(x) : NaN;
+}
+function parseAlloc(s) {
+  let x = String(s ?? '').toLowerCase().replace(/rp\.?/g, '').replace(/\s+/g, '');
+  if (!x) return null;
+  let t = null, mult = 1;
+  if (x.endsWith('%')) { t = 'pct'; x = x.slice(0, -1); }
+  else { const m = /^(.*?)(miliar|juta|jt|ribu|rb|k)$/.exec(x); if (m) { x = m[1]; t = 'amt'; mult = { miliar: 1e9, juta: 1e6, jt: 1e6, ribu: 1e3, rb: 1e3, k: 1e3 }[m[2]]; } }
+  const n = numFromText(x, t !== 'pct');
+  if (isNaN(n)) return { bad: true };
+  const v = Math.round(n * mult * 100) / 100;
+  if (!t) t = v > 100 ? 'amt' : 'pct';
+  if (t === 'pct' && v > 100) return { bad: true };
+  return { t, v };
+}
+const fmtPct = n => (Math.round(n * 100) / 100).toString().replace('.', ',') + '%';
+const fmtAlloc = a => a.t === 'pct' ? fmtPct(a.v) : 'Rp ' + fmtRp.format(a.v);
+const allocTag = s => { const a = parseAlloc(s); return a && !a.bad ? ' · ' + fmtAlloc(a) : ''; };
+const allocCanon = a => a.t === 'pct' ? String(a.v).replace('.', ',') + '%' : String(a.v);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const norm = s => String(s ?? '').replace(/\s+/g, ' ').trim();
 const slug = s => norm(s).toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 120);
@@ -503,6 +554,7 @@ onAuthStateChanged(auth, user => {
       const m = new Map();
       snap.forEach(d => m.set(d.id, { id: d.id, ...d.data() }));
       mutasi = m; mutasiLoaded = true; renderAll();
+      if (!$('#ovCsvHist').classList.contains('hidden')) renderCsvHist();
     }, err => console.error(err));
     unsub = () => { u1(); u2(); u3(); u4(); };
   } else {
@@ -515,7 +567,7 @@ onAuthStateChanged(auth, user => {
 const colRef = () => collection(db, 'users', uid, 'codes');
 const payload = (r, source, importId = null) => ({
   dana: r.dana, kontak: r.kontak, kode: r.kode, keterangan: r.keterangan,
-  debit1: r.debit1, kredit1: r.kredit1, debit2: r.debit2, kredit2: r.kredit2,
+  ...Object.fromEntries(JPAIRS.flatMap(n => [['debit' + n, r['debit' + n] || ''], ['kredit' + n, r['kredit' + n] || ''], ['persen' + n, r['persen' + n] || '']])),
   source, importId: importId || null, folderId: currentFolder === '__none' ? null : currentFolder, updatedAt: serverTimestamp()
 });
 const clean = r => { const o = {}; FIELDS.forEach(f => o[f] = norm(r[f])); return o; };
@@ -638,7 +690,7 @@ function rekOf(kode) {
   return 'Lainnya';
 }
 const REK_LABEL = { 'P-PRK': 'P-PRK (Penampungan)', 'U-O': 'U-O (Operasional)', 'Lainnya': 'Lainnya' };
-function haystack(r) { return (r.kode + ' ' + r.kontak + ' ' + r.dana + ' ' + r.keterangan + ' ' + r.debit1 + ' ' + r.kredit1 + ' ' + r.debit2 + ' ' + r.kredit2).toLowerCase(); }
+function haystack(r) { return (r.kode + ' ' + r.kontak + ' ' + r.dana + ' ' + r.keterangan + ' ' + jAll(r).join(' ')).toLowerCase(); }
 
 function render() {
   const all = inFolder();
@@ -659,7 +711,7 @@ function render() {
 
   // datalists
   $('#dlDana').innerHTML = [...new Set(['Dana Masuk', 'Dana Keluar', 'Non-Kas', ...all.map(r => r.dana).filter(Boolean)])].map(v => '<option value="' + esc(v) + '">').join('');
-  $('#dlAkun').innerHTML = [...new Set(all.flatMap(r => [r.debit1, r.kredit1, r.debit2, r.kredit2]).filter(Boolean))].sort().map(v => '<option value="' + esc(v) + '">').join('');
+  $('#dlAkun').innerHTML = [...new Set(all.flatMap(jAll).filter(Boolean))].sort().map(v => '<option value="' + esc(v) + '">').join('');
 
   // filter + search
   const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
@@ -682,17 +734,17 @@ function render() {
 
   const shown = rows.slice(0, limit);
   list.innerHTML = shown.map(r => {
-    const j1 = (r.debit1 || r.kredit1), j2 = (r.debit2 || r.kredit2);
-    const jr = (n, d, k) => (d || k) ? '<div class="jr">' +
+    const hasJ = JPAIRS.some(n => r['debit' + n] || r['kredit' + n]);
+    const jr = (n, d, k, pc) => (d || k) ? '<div class="jr">' +
       '<div class="j d"><span>Debit ' + n + '</span>' + (d ? acct(d, terms) : '—') + '</div>' +
-      '<div class="j k"><span>Kredit ' + n + '</span>' + (k ? acct(k, terms) : '—') + '</div></div>' : '';
+      '<div class="j k"><span>Kredit ' + n + allocTag(pc) + '</span>' + (k ? acct(k, terms) : '—') + '</div></div>' : '';
     return '<article class="card" data-id="' + esc(r.id) + '">' +
       '<div class="row1"><button class="kode" type="button" data-copy="' + esc(r.kode) + '" title="Salin kode">' + hl(r.kode, terms) +
       ' <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button>' +
       (r.dana ? '<span class="badge ' + danaClass(r.dana) + '">' + hl(r.dana, terms) + '</span>' : '') + '</div>' +
       '<div class="kontak">' + hl(r.kontak || '-', terms) + '</div>' +
       (r.keterangan ? '<p class="ket">' + hl(r.keterangan, terms) + '</p>' : '') +
-      ((j1 || j2) ? '<details' + (terms.length ? ' open' : '') + '><summary>Lihat jurnal</summary>' + jr(1, r.debit1, r.kredit1) + jr(2, r.debit2, r.kredit2) + '</details>' : '') +
+      (hasJ ? '<details' + (terms.length ? ' open' : '') + '><summary>Lihat jurnal</summary>' + JPAIRS.map(n => jr(n, r['debit' + n], r['kredit' + n], r['persen' + n])).join('') + '</details>' : '') +
       '<div class="actions"><button type="button" data-edit>Ubah</button><button type="button" class="del" data-del>Hapus</button></div>' +
       '</article>';
   }).join('') + (rows.length > limit ? '<button class="btn more" id="more" type="button">Tampilkan lebih banyak (' + (rows.length - limit) + ')</button>' : '');
@@ -725,12 +777,38 @@ $('#list').addEventListener('click', async e => {
 
 /* ================= Form tambah / ubah ================= */
 let editingId = null;
-const fMap = { kode:'#fKode', dana:'#fDana', kontak:'#fKontak', keterangan:'#fKet', debit1:'#fD1', kredit1:'#fK1', debit2:'#fD2', kredit2:'#fK2' };
+$('#jPairs').innerHTML = JPAIRS.map(n => '<div class="g3 jp' + (n > 2 ? ' hidden' : '') + '" data-n="' + n + '">' +
+  '<div><label class="f" for="fD' + n + '">Debit ' + n + '</label><input id="fD' + n + '" class="inp" list="dlAkun"></div>' +
+  '<div><label class="f" for="fK' + n + '">Kredit ' + n + '</label><input id="fK' + n + '" class="inp" list="dlAkun"></div>' +
+  '<div><label class="f" for="fP' + n + '">% / Rp ' + n + '</label><input id="fP' + n + '" class="inp" autocomplete="off" placeholder="25% / 1jt"></div></div>').join('');
+const fMap = Object.assign({ kode:'#fKode', dana:'#fDana', kontak:'#fKontak', keterangan:'#fKet' },
+  Object.fromEntries(JPAIRS.flatMap(n => [['debit' + n, '#fD' + n], ['kredit' + n, '#fK' + n], ['persen' + n, '#fP' + n]])));
+let jShown = 2;
+function updatePctSum() {
+  const el = $('#pctSum'); if (!el) return;
+  const als = JPAIRS.filter(n => n <= jShown).map(n => parseAlloc($('#fP' + n).value)).filter(a => a && !a.bad);
+  if (!als.length) { el.textContent = ''; return; }
+  const sp = Math.round(als.filter(a => a.t === 'pct').reduce((x, a) => x + a.v, 0) * 100) / 100;
+  const sa = als.filter(a => a.t === 'amt').reduce((x, a) => x + a.v, 0);
+  const parts = []; if (als.some(a => a.t === 'pct')) parts.push(fmtPct(sp)); if (sa) parts.push('Rp ' + fmtRp.format(sa));
+  el.textContent = 'Terisi: ' + parts.join(' + ') + (sp > 100 ? ' (persentase melebihi 100%)' : ' · pasangan yang dikosongkan terakhir otomatis mengambil sisa');
+  el.style.color = sp > 100 ? 'var(--warn)' : 'var(--muted)';
+}
+$('#jPairs').addEventListener('input', e => { if (e.target.id && e.target.id.startsWith('fP')) updatePctSum(); });
+function showPairs(c) {
+  jShown = Math.max(2, Math.min(JN, c));
+  document.querySelectorAll('#jPairs .jp').forEach(el => el.classList.toggle('hidden', +el.dataset.n > jShown));
+  $('#fAddJ').classList.toggle('hidden', jShown >= JN);
+  updatePctSum();
+  $('#fAddJ').textContent = '＋ Tambah Debit ' + (jShown + 1) + ' / Kredit ' + (jShown + 1);
+}
+$('#fAddJ').onclick = () => { showPairs(jShown + 1); setTimeout(() => $('#fD' + jShown).focus(), 30); };
 function openForm(rec) {
   editingId = rec ? rec.id : null;
   $('#formTitle').textContent = rec ? 'Ubah Kode' : 'Tambah Kode';
   Object.entries(fMap).forEach(([f, sel]) => $(sel).value = rec ? (rec[f] || '') : '');
   $('#formMsg').textContent = '';
+  showPairs(Math.max(2, ...JPAIRS.filter(n => rec && (rec['debit' + n] || rec['kredit' + n]))));
   show($('#ovForm'), true);
   setTimeout(() => $('#fKode').focus(), 50);
 }
@@ -741,6 +819,12 @@ $('#ovForm').addEventListener('mousedown', e => { if (e.target.id === 'ovForm') 
 $('#fSave').onclick = async () => {
   const r = {}; Object.entries(fMap).forEach(([f, sel]) => r[f] = norm($(sel).value));
   if (!r.kode) { $('#formMsg').textContent = 'Kode Transaksi wajib diisi.'; return; }
+  for (const n of JPAIRS) {
+    if (!r['persen' + n]) continue;
+    const a = parseAlloc(r['persen' + n]);
+    if (!a || a.bad) { $('#formMsg').textContent = 'Isian % / nominal pasangan ' + n + ' tidak valid. Contoh: 25% (maks. 100%), 1jt, 500rb, atau 1.000.000.'; return; }
+    r['persen' + n] = allocCanon(a);
+  }
   if (!r.kontak) r.kontak = '-';
   const key = makeId(r.kode, r.kontak);
   const rec = editingId ? data.get(editingId) : null;
@@ -784,8 +868,9 @@ function parseWorkbook(wb) {
   const out = [];
   const keyOf = h => {
     h = norm(h).toLowerCase();
-    return { 'dana':'dana', 'nama kontak':'kontak', 'kontak':'kontak', 'kode transaksi':'kode', 'kode':'kode', 'keterangan':'keterangan',
-      'debit 1':'debit1', 'kredit 1':'kredit1', 'debit 2':'debit2', 'kredit 2':'kredit2', 'debit1':'debit1', 'kredit1':'kredit1', 'debit2':'debit2', 'kredit2':'kredit2' }[h];
+    const m = /^(debit|kredit|persen|persentase|%)\s*(\d+)$/.exec(h);
+    if (m) return (+m[2] >= 1 && +m[2] <= JN) ? ((m[1] === 'debit' || m[1] === 'kredit') ? m[1] : 'persen') + (+m[2]) : undefined;
+    return { 'dana':'dana', 'nama kontak':'kontak', 'kontak':'kontak', 'kode transaksi':'kode', 'kode':'kode', 'keterangan':'keterangan' }[h];
   };
   for (const name of wb.SheetNames) {
     const aoa = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: '', raw: false });
@@ -795,7 +880,7 @@ function parseWorkbook(wb) {
     if (!('kode' in col)) continue;
     for (let i = hi + 1; i < aoa.length; i++) {
       const row = aoa[i]; const o = {};
-      FIELDS.forEach(f => o[f] = f in col ? norm(row[col[f]]) : '');
+      FIELDS.forEach(f => { if (f in col) o[f] = norm(row[col[f]]); else if (!f.startsWith('persen')) o[f] = ''; });   // kolom persen yang tidak ada di file: data lama dipertahankan
       if (!o.kode) continue;                 // lewati baris kosong / catatan
       if (!o.kontak) o.kontak = '-';
       out.push(o);
@@ -823,6 +908,7 @@ function buildPlan(rows) {
     }
     if (!old) { add.push(r); return; }
     usedOld.add(old.id);
+    FIELDS.forEach(f => { if (r[f] === undefined) r[f] = norm(old[f]); });
     const diffs = FIELDS.filter(f => norm(old[f]) !== norm(r[f]));
     if (!diffs.length) same.push(r); else upd.push({ old, rec: r, diffs });
   });
@@ -984,19 +1070,55 @@ const txFolderKey = () => currentFolder === '__none' ? 'none' : currentFolder;
 const txInFolder = () => [...mutasi.values()].filter(t => (t.folderId || '__none') === currentFolder);
 const txJenis = t => JENIS_MAP[t.rek] || '';
 const txPrefix = t => (t.dana && t.rek) ? t.dana + '-' + t.rek + '-' + txJenis(t) + '-' : '';
-const txFull = t => (t.dana && t.rek && t.final) ? txPrefix(t) + t.final : '';
-const csvEditing = () => document.activeElement && document.activeElement.classList && document.activeElement.classList.contains('fin');
+// Satu transaksi bisa punya beberapa kode: t.codes = [{ final, amt }]; data lama (t.final saja) dibaca sebagai satu kode
+const txLines = t => (Array.isArray(t.codes) && t.codes.length) ? t.codes : [{ final: t.final || '', amt: '' }];
+const lineFull = (t, l) => (t.dana && t.rek && l.final) ? txPrefix(t) + l.final : '';
+const txFulls = t => txLines(t).map(l => lineFull(t, l)).filter(Boolean);
+const txFull = t => txFulls(t).join(' ');
+const txDone = t => txLines(t).every(l => lineFull(t, l));
+const parseIdAmt = v => { const n = parseFloat(String(v || '').replace(/[^\d.,]/g, '').replace(/\./g, '').replace(',', '.')); return isNaN(n) ? '' : n; };
+let focusLine = null;
+function saveLines(t, lines) {
+  const cl = lines.map(l => ({ final: l.final || '', amt: (l.amt === '' || l.amt == null || isNaN(l.amt)) ? '' : Number(l.amt) }));
+  return patchTx(t.id, { codes: cl, final: cl[0].final });
+}
+const csvEditing = () => document.activeElement && document.activeElement.classList && (document.activeElement.classList.contains('fin') || document.activeElement.classList.contains('nom'));
 
 async function patchTx(id, fields) {
   try { const b = writeBatch(db); b.update(doc(db, 'users', uid, 'mutasi', id), fields); await b.commit(); }
   catch (err) { toast('Gagal menyimpan: ' + (err.code || err.message), 4000); }
 }
 
+function calcHtml(rec, base) {
+  const pairs = JPAIRS.filter(n => rec['debit' + n] || rec['kredit' + n]);
+  if (!pairs.length) return '';
+  const al = {}, val = {}; let used = 0;
+  pairs.forEach(n => {
+    const a = parseAlloc(rec['persen' + n]); al[n] = (a && !a.bad) ? a : null;
+    if (al[n]) { val[n] = al[n].t === 'pct' ? Math.round(base * al[n].v) / 100 : al[n].v; used += val[n]; }
+  });
+  const anyAl = pairs.some(n => al[n]);
+  const blanks = pairs.filter(n => !al[n]), lastBlank = blanks[blanks.length - 1];
+  const rest = Math.round((base - used) * 100) / 100;     // sisa untuk pasangan kosong terakhir
+  let html = pairs.map(n => {
+    let v, sm = '', st = '';
+    if (al[n]) { v = fmtRp.format(val[n]); sm = fmtAlloc(al[n]); }
+    else if (!anyAl) { v = fmtRp.format(base); sm = '100% (default)'; }
+    else if (n === lastBlank) { v = fmtRp.format(rest); sm = rest < 0 ? 'sisa (melebihi total)' : 'sisa otomatis'; if (rest < 0) st = ' style="color:var(--danger)"'; }
+    else { v = '—'; sm = 'isi % / nominal'; }
+    return '<div class="jc"><div class="a"><b>Debit ' + n + '</b> · ' + esc(rec['debit' + n] || '—') + '</div><div class="a"><b>Kredit ' + n + '</b> · ' + esc(rec['kredit' + n] || '—') + '</div>' +
+      '<div class="v"' + st + '>' + v + '<small>' + sm + '</small></div></div>';
+  }).join('');
+  if (anyAl && !blanks.length && Math.abs(rest) >= 0.005)
+    html += '<div class="jc"><div class="a">Selisih dari total transaksi</div><div class="v" style="color:var(--warn)">' + fmtRp.format(rest) + '</div></div>';
+  return '<div class="jcalc">' + html + '</div>';
+}
+
 function renderCsv() {
   const list = $('#csvList');
   if (!loaded || !mutasiLoaded) { list.innerHTML = '<div class="empty"><p>Memuat data…</p></div>'; return; }
   const all = txInFolder();
-  const isDone = t => !!txFull(t);
+  const isDone = txDone;
   const nDone = all.filter(isDone).length;
   $('#csvChips').innerHTML =
     '<button class="chip ' + (!csvFilter ? 'on' : '') + '" data-c="">Semua<small>' + all.length + '</small></button>' +
@@ -1009,26 +1131,42 @@ function renderCsv() {
   }
   const terms = csvQuery.toLowerCase().split(/\s+/).filter(Boolean);
   const known = new Set(inFolder().map(c => String(c.kode).toUpperCase()));
+  const codeRec = new Map(); inFolder().forEach(c => { const k = String(c.kode).toUpperCase(); if (!codeRec.has(k)) codeRec.set(k, c); });
   let rows = all.filter(t => (!csvFilter || (csvFilter === 'done') === isDone(t)) &&
     terms.every(w => (t.keterangan + ' ' + t.tanggal + ' ' + txFull(t) + ' ' + t.jumlahRaw).toLowerCase().includes(w)));
   rows.sort((a, b) => (b.tanggalISO || '').localeCompare(a.tanggalISO || '') || (a.seq || 0) - (b.seq || 0));
   const shown = rows.slice(0, csvLimit);
   if (!rows.length) { list.innerHTML = '<div class="empty"><h3>Tidak ditemukan</h3></div>'; return; }
   list.innerHTML = shown.map(t => {
-    const full = txFull(t), cls = t.dana === 'CR' ? 'cr' : 'db', pre = txPrefix(t);
-    const reg = full ? (known.has(full.toUpperCase()) ? '<span class="reg" style="color:var(--in-fg)">✓ ada di daftar kode</span>' : '<span class="reg" style="color:var(--warn)">⚠ belum ada di daftar kode</span>') : '';
+    const cls = t.dana === 'CR' ? 'cr' : 'db', lines = txLines(t), multi = lines.length > 1;
+    const lineHtml = lines.map((l, i) => {
+      const full = lineFull(t, l);
+      const reg = full ? (known.has(full.toUpperCase()) ? '<span class="reg" style="color:var(--in-fg)">✓ ada di daftar kode</span>' : '<span class="reg" style="color:var(--warn)">⚠ belum ada di daftar kode</span><button type="button" class="addk" data-add-code="' + esc(full) + '">＋ Tambah kode</button>') : '';
+      const rekEl = i === 0
+        ? '<select class="seg ' + (t.rek ? '' : 'need') + '" data-rek title="Kode Rekening"><option value="">?</option><option value="P"' + (t.rek === 'P' ? ' selected' : '') + '>P</option><option value="U"' + (t.rek === 'U' ? ' selected' : '') + '>U</option></select>'
+        : '<span class="seg ' + (t.rek ? '' : 'need') + '" title="Kode Rekening">' + (esc(t.rek) || '?') + '</span>';
+      return '<div class="ln" data-i="' + i + '"><div class="build"><span class="seg ' + cls + '" title="Kode Dana">' + esc(t.dana) + '</span><i>-</i>' + rekEl + '<i>-</i>' +
+        '<span class="seg" title="Kode Jenis">' + (esc(txJenis(t)) || '…') + '</span><i>-</i>' +
+        '<div class="fwrap"><input class="inp fin" autocomplete="off" spellcheck="false" placeholder="Kode final (cari…)" value="' + esc(l.final || '') + '"><div class="sg hidden"></div></div>' +
+        (multi ? '<input class="inp nom" inputmode="decimal" autocomplete="off" placeholder="Nominal (ops.)" value="' + (l.amt === '' || l.amt == null ? '' : esc(fmtRp.format(l.amt))) + '"><button type="button" class="rm" data-rm-line title="Hapus kode ini">✕</button>' : '') + '</div>' +
+        '<div class="full ' + (full ? 'ok' : '') + '">' + (full ? '<code>' + esc(full) + '</code>' : '<span>' + (t.rek ? 'Pilih / ketik kode final untuk melengkapi kode' : 'Pilih kode rekening (P / U) dulu') + '</span>') +
+        '<div class="ac">' + reg + (full ? '<button type="button" data-copy-tx="' + esc(full) + '">Salin</button>' : '') + '</div></div>' +
+        (full && codeRec.get(full.toUpperCase()) ? calcHtml(codeRec.get(full.toUpperCase()), (multi && l.amt !== '' && l.amt != null) ? Number(l.amt) : t.jumlah) : '') + '</div>';
+    }).join('');
+    const anyAmt = lines.some(l => l.amt !== '' && l.amt != null);
+    const diff = Math.round((t.jumlah - lines.reduce((a, l) => a + (Number(l.amt) || 0), 0)) * 100) / 100;
+    const sisa = multi && anyAmt ? (Math.abs(diff) < 0.005 ? '<span class="sisa ok">✓ nominal pas</span>' : '<span class="sisa">Sisa ' + fmtRp.format(diff) + '</span>') : '';
     return '<article class="tx" data-id="' + esc(t.id) + '">' +
       '<div class="tx1"><span class="tgl">' + esc(t.tanggal) + '<small>…' + esc(String(t.rekening || '').slice(-4)) + '</small></span>' +
       '<span class="amt ' + cls + '">' + (t.dana === 'CR' ? '+ ' : '− ') + fmtRp.format(t.jumlah) + '</span></div>' +
-      '<p class="ket">' + esc(t.keterangan) + '</p>' +
-      '<div class="build"><span class="seg ' + cls + '" title="Kode Dana">' + esc(t.dana) + '</span><i>-</i>' +
-      '<select class="seg ' + (t.rek ? '' : 'need') + '" data-rek title="Kode Rekening"><option value="">?</option><option value="P"' + (t.rek === 'P' ? ' selected' : '') + '>P</option><option value="U"' + (t.rek === 'U' ? ' selected' : '') + '>U</option></select><i>-</i>' +
-      '<span class="seg" title="Kode Jenis">' + (esc(txJenis(t)) || '…') + '</span><i>-</i>' +
-      '<div class="fwrap"><input class="inp fin" autocomplete="off" spellcheck="false" placeholder="Kode final (cari…)" value="' + esc(t.final || '') + '"><div class="sg hidden"></div></div></div>' +
-      '<div class="full ' + (full ? 'ok' : '') + '">' + (full ? '<code>' + esc(full) + '</code>' : '<span>' + (t.rek ? 'Pilih / ketik kode final untuk melengkapi kode' : 'Pilih kode rekening (P / U) dulu') + '</span>') +
-      '<div class="ac">' + reg + (full ? '<button type="button" data-copy-tx="' + esc(full) + '">Salin</button>' : '') + '<button type="button" class="del" data-del-tx>Hapus</button></div></div>' +
+      '<p class="ket">' + esc(t.keterangan) + '</p>' + lineHtml +
+      '<div class="tfoot"><button type="button" class="link" data-add-line>＋ Tambah kode lain</button>' + sisa + '<span class="sp"></span><button type="button" class="link" style="color:var(--danger)" data-del-tx>Hapus transaksi</button></div>' +
       '</article>';
   }).join('') + (rows.length > csvLimit ? '<button class="btn more" id="moreCsv" type="button">Tampilkan lebih banyak (' + (rows.length - csvLimit) + ')</button>' : '');
+  if (focusLine) {
+    const el = list.querySelector('.tx[data-id="' + CSS.escape(focusLine.id) + '"] .ln[data-i="' + focusLine.i + '"] .fin');
+    if (el) { focusLine = null; el.focus(); }
+  }
 }
 
 /* --- saran kode final (pencarian kode) --- */
@@ -1047,9 +1185,9 @@ function suggestFor(t, qtext) {
   }).sort((a, b) => b.score - a.score || String(a.x.kode).localeCompare(String(b.x.kode)));
   return { pre, items: scored };
 }
-function showSugg(card, typed) {
-  const t = mutasi.get(card.dataset.id); if (!t) return;
-  const inp = card.querySelector('.fin'), box = card.querySelector('.sg');
+function showSugg(inp, typed) {
+  const t = mutasi.get(inp.closest('.tx').dataset.id); if (!t) return;
+  const box = inp.parentElement.querySelector('.sg');
   const { pre, items } = suggestFor(t, typed ? inp.value.replace(pre0(t), '') : '');
   document.querySelectorAll('#csvList .sg').forEach(b => { if (b !== box) b.classList.add('hidden'); });
   if (!pre) { box.innerHTML = '<div class="si none">Pilih kode rekening (P / U) dulu.</div>'; }
@@ -1068,34 +1206,69 @@ function normFinal(t, v) {
   return pre && v.startsWith(pre) ? v.slice(pre.length) : v;
 }
 
-$('#csvList').addEventListener('focusin', e => { if (e.target.classList.contains('fin')) showSugg(e.target.closest('.tx'), false); });
-$('#csvList').addEventListener('input', e => { if (e.target.classList.contains('fin')) showSugg(e.target.closest('.tx'), true); });
+$('#csvList').addEventListener('focusin', e => { if (e.target.classList.contains('fin')) showSugg(e.target, false); });
+$('#csvList').addEventListener('input', e => { if (e.target.classList.contains('fin')) showSugg(e.target, true); });
 $('#csvList').addEventListener('focusout', e => {
-  if (!e.target.classList.contains('fin')) return;
+  if (!e.target.classList.contains('fin') && !e.target.classList.contains('nom')) return;
   setTimeout(() => {
     document.querySelectorAll('#csvList .sg').forEach(b => b.classList.add('hidden'));
     if (csvPending && !csvEditing()) { csvPending = false; renderCsv(); }
   }, 200);
 });
-$('#csvList').addEventListener('keydown', e => { if (e.target.classList.contains('fin') && e.key === 'Enter') e.target.blur(); });
+$('#csvList').addEventListener('keydown', e => { if ((e.target.classList.contains('fin') || e.target.classList.contains('nom')) && e.key === 'Enter') e.target.blur(); });
 $('#csvList').addEventListener('change', e => {
   const card = e.target.closest('.tx'); if (!card) return;
   const t = mutasi.get(card.dataset.id); if (!t) return;
-  if (e.target.classList.contains('fin')) { const v = normFinal(t, e.target.value); if (v !== (t.final || '')) patchTx(t.id, { final: v }); }
+  const ln = e.target.closest('.ln'), i = ln ? +ln.dataset.i : 0;
+  if (e.target.classList.contains('fin')) {
+    const v = normFinal(t, e.target.value), lines = txLines(t).map(l => ({ ...l }));
+    if (lines[i] && v !== (lines[i].final || '')) { lines[i].final = v; saveLines(t, lines); }
+  }
+  if (e.target.classList.contains('nom')) {
+    const lines = txLines(t).map(l => ({ ...l }));
+    if (lines[i]) { lines[i].amt = parseIdAmt(e.target.value); saveLines(t, lines); }
+  }
   if (e.target.matches('[data-rek]')) patchTx(t.id, { rek: e.target.value });
 });
 $('#csvList').addEventListener('mousedown', e => {
   const si = e.target.closest('.si[data-code]'); if (!si) return;
   e.preventDefault();
-  const card = si.closest('.tx'), t = mutasi.get(card.dataset.id), inp = card.querySelector('.fin');
+  const ln = si.closest('.ln'), card = si.closest('.tx'), t = mutasi.get(card.dataset.id), inp = ln.querySelector('.fin'), i = +ln.dataset.i;
   const fin = si.dataset.code.slice(txPrefix(t).length);
   inp.value = fin; inp.blur();
-  if (fin !== (t.final || '')) patchTx(t.id, { final: fin });
+  const lines = txLines(t).map(l => ({ ...l }));
+  if (lines[i] && fin !== (lines[i].final || '')) { lines[i].final = fin; saveLines(t, lines); }
 });
 $('#csvList').addEventListener('touchstart', e => { /* biarkan scroll daftar saran */ }, { passive: true });
 $('#csvList').addEventListener('click', async e => {
   if (e.target.closest('#emptyCsv')) return $('#btnCsv').click();
   if (e.target.closest('#moreCsv')) { csvLimit += 100; renderCsv(); return; }
+  const ad = e.target.closest('[data-add-code]');
+  if (ad) {
+    const t = mutasi.get(ad.closest('.tx').dataset.id); if (!t) return;
+    const all = inFolder();
+    $('#dlDana').innerHTML = [...new Set(['Dana Masuk', 'Dana Keluar', 'Non-Kas', ...all.map(r => r.dana).filter(Boolean)])].map(v => '<option value="' + esc(v) + '">').join('');
+    $('#dlAkun').innerHTML = [...new Set(all.flatMap(jAll).filter(Boolean))].sort().map(v => '<option value="' + esc(v) + '">').join('');
+    openForm(null);
+    $('#fKode').value = ad.dataset.addCode;
+    $('#fDana').value = t.dana === 'CR' ? 'Dana Masuk' : 'Dana Keluar';
+    setTimeout(() => $('#fKontak').focus(), 80);
+    return;
+  }
+  const al = e.target.closest('[data-add-line]');
+  if (al) {
+    const t = mutasi.get(al.closest('.tx').dataset.id); if (!t) return;
+    const lines = txLines(t).map(l => ({ ...l })); lines.push({ final: '', amt: '' });
+    focusLine = { id: t.id, i: lines.length - 1 };
+    await saveLines(t, lines); return;
+  }
+  const rm = e.target.closest('[data-rm-line]');
+  if (rm) {
+    const t = mutasi.get(rm.closest('.tx').dataset.id), i = +rm.closest('.ln').dataset.i; if (!t) return;
+    const lines = txLines(t).map(l => ({ ...l })); if (lines.length < 2 || !lines[i]) return;
+    if (lines[i].final && !confirm('Hapus kode ' + lineFull(t, lines[i]) + ' dari transaksi ini?')) return;
+    lines.splice(i, 1); await saveLines(t, lines); return;
+  }
   const cp = e.target.closest('[data-copy-tx]');
   if (cp) {
     try { await navigator.clipboard.writeText(cp.dataset.copyTx); }
@@ -1117,24 +1290,77 @@ $('#cq').addEventListener('input', e => { clearTimeout(cqT); cqT = setTimeout(()
 /* --- impor / hapus / ekspor --- */
 $('#btnCsv').onclick = () => { if (!loaded || !mutasiLoaded) return toast('Data masih dimuat, tunggu sebentar…'); $('#csvFile').click(); };
 $('#csvFile').addEventListener('change', async e => {
-  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
-  try {
-    const res = parseMutasi(parseCsv(await f.text()));
-    if (!res.rows.length) return toast('Tidak ada transaksi terbaca. Pastikan file CSV mutasi rekening (ada kolom "Tanggal Transaksi").', 5500);
-    const fk = txFolderKey();
-    const seen = new Set(mutasi.keys()); const fresh = []; let dup = 0;
-    res.rows.forEach(r => { const id = fk + '__' + r.hash; if (seen.has(id)) dup++; else { seen.add(id); fresh.push({ id, r }); } });
-    if (!navigator.onLine && fresh.length) return toast('Tidak ada koneksi internet.', 3500);
-    for (let i = 0; i < fresh.length; i += 400) {
-      const b = writeBatch(db);
-      fresh.slice(i, i + 400).forEach(({ id, r }) => b.set(doc(db, 'users', uid, 'mutasi', id), { ...r, folderId: currentFolder === '__none' ? null : currentFolder, fileName: f.name, importedAt: serverTimestamp() }));
-      await b.commit();
-    }
-    let msg = fresh.length + ' transaksi ditambahkan' + (dup ? ', ' + dup + ' sudah ada (dilewati)' : '') + (res.skipped ? ', ' + res.skipped + ' baris tidak terbaca' : '') + '.';
-    if (!REK_MAP[res.rekening]) msg += ' Rekening ' + (res.rekening || '(tidak terbaca)') + ' belum dikenal — pilih kode rekening manual.';
-    toast(msg, 6000);
-  } catch (err) { console.error(err); toast('Gagal membaca CSV: ' + (err.message || err), 5000); }
+  const files = [...e.target.files]; e.target.value = ''; if (!files.length) return;
+  if (!navigator.onLine) return toast('Tidak ada koneksi internet.', 3500);
+  const fk = txFolderKey();
+  const seen = new Set(mutasi.keys());
+  const stamp = Date.now().toString(36);
+  let fi = 0, added = 0, dup = 0, skipped = 0, bad = [], unknown = new Set();
+  toast('Memproses ' + files.length + ' file…', 1500);
+  for (const f of files) {
+    try {
+      const res = parseMutasi(parseCsv(await f.text()));
+      if (!res.rows.length) { bad.push(f.name); continue; }
+      skipped += res.skipped;
+      if (!REK_MAP[res.rekening]) unknown.add(res.rekening || '(tidak terbaca)');
+      const iid = 'c' + stamp + (fi++).toString(36);
+      const fresh = [];
+      res.rows.forEach(r => { const id = fk + '__' + r.hash; if (seen.has(id)) dup++; else { seen.add(id); fresh.push({ id, r }); } });
+      for (let i = 0; i < fresh.length; i += 400) {
+        const b = writeBatch(db);
+        fresh.slice(i, i + 400).forEach(({ id, r }) => b.set(doc(db, 'users', uid, 'mutasi', id), { ...r, folderId: currentFolder === '__none' ? null : currentFolder, fileName: f.name, importId: iid, importedAt: serverTimestamp() }));
+        await b.commit();
+      }
+      added += fresh.length;
+    } catch (err) { console.error(err); bad.push(f.name); }
+  }
+  let msg = (files.length > 1 ? files.length + ' file: ' : '') + added + ' transaksi ditambahkan' + (dup ? ', ' + dup + ' sudah ada (dilewati)' : '') + (skipped ? ', ' + skipped + ' baris tidak terbaca' : '') + '.';
+  if (bad.length) msg += ' Gagal dibaca: ' + bad.join(', ') + '.';
+  if (unknown.size) msg += ' Rekening ' + [...unknown].join(', ') + ' belum dikenal — pilih kode rekening manual.';
+  toast(msg, 8000);
 });
+/* --- riwayat impor CSV --- */
+const txT = t => (t.importedAt && typeof t.importedAt.toMillis === 'function') ? t.importedAt.toMillis() : 0;
+function csvGroups() {
+  const g = new Map();
+  txInFolder().forEach(t => {
+    const key = t.importId || ('f:' + (t.fileName || ''));
+    if (!g.has(key)) g.set(key, { key, fileName: t.fileName || '(tanpa nama file)', t: 0, rows: [] });
+    const x = g.get(key); x.rows.push(t); x.t = Math.max(x.t, txT(t));
+  });
+  return [...g.values()].sort((a, b) => b.t - a.t);
+}
+function renderCsvHist() {
+  const gs = csvGroups();
+  $('#csvHistList').innerHTML = gs.map(g => {
+    const iso = g.rows.map(t => t.tanggalISO).filter(Boolean).sort();
+    const rng = iso.length ? (g.rows.find(t => t.tanggalISO === iso[0]).tanggal + (iso[0] !== iso[iso.length - 1] ? ' – ' + g.rows.find(t => t.tanggalISO === iso[iso.length - 1]).tanggal : '')) : '';
+    const reks = [...new Set(g.rows.map(t => String(t.rekening || '').slice(-4)).filter(Boolean))].map(s => '…' + s).join(', ');
+    const done = g.rows.filter(txDone).length;
+    return '<div class="hi"><b>' + esc(g.fileName) + '</b><div class="m">' + (g.t ? fmtDate(g.t) + ' · ' : '') + g.rows.length + ' transaksi' + (rng ? ' · ' + esc(rng) : '') + (reks ? ' · rek ' + esc(reks) : '') + '</div>' +
+      '<div class="r"><span>' + done + ' dari ' + g.rows.length + ' sudah berkode lengkap</span><button class="btn danger" type="button" data-cdel="' + esc(g.key) + '">Hapus Impor</button></div></div>';
+  }).join('') || '<div class="empty" style="padding:26px 10px"><p>Belum ada riwayat impor CSV di folder ini.</p></div>';
+}
+$('#btnCsvHist').onclick = () => { if (!loaded || !mutasiLoaded) return toast('Data masih dimuat, tunggu sebentar…'); renderCsvHist(); show($('#ovCsvHist'), true); };
+$('#csvHistClose').onclick = () => show($('#ovCsvHist'), false);
+$('#ovCsvHist').addEventListener('mousedown', e => { if (e.target.id === 'ovCsvHist') show($('#ovCsvHist'), false); });
+$('#csvHistList').addEventListener('click', async e => {
+  const b = e.target.closest('[data-cdel]'); if (!b) return;
+  const g = csvGroups().find(x => x.key === b.dataset.cdel); if (!g) return;
+  const done = g.rows.filter(txDone).length;
+  if (!confirm('Hapus impor "' + g.fileName + '"?\n\n' + g.rows.length + ' transaksi hasil impor ini akan IKUT TERHAPUS' + (done ? ' (termasuk ' + done + ' yang sudah berkode final)' : '') + ' dan tidak bisa dikembalikan.\n\nKode di Rincian Kode tidak terpengaruh.')) return;
+  if (!navigator.onLine) return toast('Tidak ada koneksi internet.', 3500);
+  b.disabled = true;
+  try {
+    for (let i = 0; i < g.rows.length; i += 400) {
+      const bt = writeBatch(db);
+      g.rows.slice(i, i + 400).forEach(t => bt.delete(doc(db, 'users', uid, 'mutasi', t.id)));
+      await bt.commit();
+    }
+    toast('Impor dihapus (' + g.rows.length + ' transaksi)', 3500);
+  } catch (err) { console.error(err); toast('Gagal menghapus: ' + (err.code || err.message), 5000); b.disabled = false; }
+});
+
 $('#btnCsvClear').onclick = async () => {
   const rows = txInFolder(); if (!rows.length) return;
   if (!confirm('Hapus semua ' + rows.length + ' transaksi CSV di folder ini?\n\nKode di Rincian Kode tidak terpengaruh. Tindakan ini tidak bisa dikembalikan.')) return;
@@ -1147,10 +1373,14 @@ $('#btnCsvExport').onclick = () => {
   if (!window.XLSX) return toast('Library Excel belum termuat. Periksa koneksi internet.', 4000);
   const rows = txInFolder().sort((a, b) => (a.tanggalISO || '').localeCompare(b.tanggalISO || '') || (a.seq || 0) - (b.seq || 0));
   if (!rows.length) return toast('Belum ada transaksi untuk diekspor.');
-  const aoa = [['Tanggal Transaksi', 'Keterangan', 'Jumlah', 'Kode Dana', 'Kode Rekening', 'Kode Jenis', 'Kode Final', 'Kode Lengkap']];
-  rows.forEach(t => aoa.push([t.tanggal, t.keterangan, (t.dana === 'DB' ? -1 : 1) * t.jumlah, t.dana, t.rek, txJenis(t), t.final || '', txFull(t)]));
+  const aoa = [['Tanggal Transaksi', 'Keterangan', 'Jumlah', 'Kode Dana', 'Kode Rekening', 'Kode Jenis', 'Kode Final', 'Kode Lengkap', 'Nominal Kode']];
+  rows.forEach(t => {
+    const sg = t.dana === 'DB' ? -1 : 1, ls = txLines(t), multi = ls.length > 1;
+    ls.forEach(l => aoa.push([t.tanggal, t.keterangan, sg * t.jumlah, t.dana, t.rek, txJenis(t), l.final || '', lineFull(t, l),
+      multi ? ((l.amt === '' || l.amt == null) ? '' : sg * l.amt) : sg * t.jumlah]));
+  });
   const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols'] = [{ wch: 16 }, { wch: 70 }, { wch: 18 }, { wch: 10 }, { wch: 14 }, { wch: 11 }, { wch: 12 }, { wch: 20 }];
+  ws['!cols'] = [{ wch: 16 }, { wch: 70 }, { wch: 18 }, { wch: 10 }, { wch: 14 }, { wch: 11 }, { wch: 12 }, { wch: 20 }, { wch: 18 }];
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Mutasi');
   XLSX.writeFile(wb, 'Essencode-Mutasi-' + (folderName(currentFolder).replace(/[^\w\- ]+/g, '').trim() || 'Rekap') + '.xlsx');
   toast('File Excel diunduh');
@@ -1162,7 +1392,8 @@ $('#btnExport').onclick = () => {
   const all = inFolder().sort((a, b) => String(a.kode).localeCompare(String(b.kode), 'id', { numeric: true }));
   if (!all.length) return toast('Belum ada data untuk diekspor.');
   // urutan kolom sama seperti file asli, sehingga bisa diimpor ulang
-  const order = ['dana', 'kontak', 'kode', 'keterangan', 'debit1', 'kredit1', 'debit2', 'kredit2'];
+  const maxJ = Math.max(2, ...all.flatMap(r => JPAIRS.filter(n => r['debit' + n] || r['kredit' + n])));
+  const order = ['dana', 'kontak', 'kode', 'keterangan', ...JPAIRS.filter(n => n <= maxJ).flatMap(n => ['debit' + n, 'kredit' + n, ...(all.some(r => r['persen' + n]) ? ['persen' + n] : [])])];
   const aoa = [['Ringkasan Kode Transaksi'], [], order.map(f => LABEL[f])];
   all.forEach(r => aoa.push(order.map(f => r[f] || '')));
   const ws = XLSX.utils.aoa_to_sheet(aoa);
