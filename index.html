@@ -150,7 +150,7 @@ textarea.inp{resize:vertical;min-height:70px}
 .brand span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:50vw}
 @media(max-width:520px){.who{display:none}}
 .ftabs{max-width:980px;margin:0 auto;padding:0 14px 8px;display:flex;gap:6px}
-.ftabs button{flex:1;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:8px;font-weight:700;color:var(--muted)}
+.ftabs button{flex:1;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:8px 4px;font-size:13px;line-height:1.2;font-weight:700;color:var(--muted)}
 .ftabs button.on{background:var(--brand);border-color:var(--brand);color:#fff}
 .csv-head{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px}
 .csv-head h2{margin:0 0 2px;font-size:18px;color:var(--brand)}
@@ -267,7 +267,7 @@ select.seg.need{border-color:var(--danger);background:#fff3f1}
     <span class="who" id="who"></span>
     <button id="logout" class="btn" type="button" style="padding:7px 11px;font-size:13px">Keluar</button>
   </div>
-  <div class="ftabs hidden" id="ftabs"><button type="button" data-t="csv" class="on">Impor CSV</button><button type="button" data-t="kode">Rincian Kode</button></div>
+  <div class="ftabs hidden" id="ftabs"><button type="button" data-t="csv" class="on">Impor CSV</button><button type="button" data-t="kgi">Rincian Kode KGI</button><button type="button" data-t="pmh">Rincian Kode PMH</button></div>
   <div class="top-sub hidden" id="topSub">
     <div class="tools">
       <div class="search">
@@ -399,6 +399,15 @@ select.seg.need{border-color:var(--danger);background:#fff3f1}
 </div></div>
 
 <!-- ===== Modal riwayat impor ===== -->
+<!-- ===== Modal pilih rincian kode untuk impor CSV ===== -->
+<div id="ovCsvTpl" class="ov hidden"><div class="sheet">
+  <h2>Impor CSV untuk rincian kode…</h2>
+  <p class="sub">Pilih rincian kode yang dipakai. Pilihan ini menentukan kode rekening dan kode jenis transaksi hasil impor.</p>
+  <button class="btn block" type="button" data-ct="KGI" style="flex-direction:column;gap:2px"><b>Rincian Kode KGI</b><small style="font-weight:500;color:var(--muted)">Kode rekening P &amp; U · kode jenis PRK &amp; O (otomatis dari nomor rekening)</small></button>
+  <button class="btn block" type="button" data-ct="PMH" style="flex-direction:column;gap:2px;margin-top:10px"><b>Rincian Kode PMH</b><small style="font-weight:500;color:var(--muted)">Kode rekening GR · kode jenis PRK</small></button>
+  <div class="foot"><button id="ctCancel" class="btn" type="button">Batal</button></div>
+</div></div>
+
 <div id="ovCsvHist" class="ov hidden"><div class="sheet">
   <h2>Riwayat Impor CSV</h2>
   <p class="sub">Menghapus sebuah impor akan ikut menghapus <b>semua transaksi</b> yang berasal dari file tersebut, termasuk kode final yang sudah dipilih.</p>
@@ -646,7 +655,7 @@ const folderName = id => id === '__none' ? 'Tanpa folder' : ((folders.get(id) ||
 
 function applyView() {
   const home = currentFolder === null;
-  const kode = !home && folderTab === 'kode';
+  const kode = !home && (folderTab === 'kgi' || folderTab === 'pmh');
   show($('#home'), home); show($('#folderView'), !home); show($('#ftabs'), !home);
   show($('#csvView'), !home && folderTab === 'csv'); show($('#kodeView'), kode);
   show($('#topSub'), kode); show($('#btnAdd'), kode); show($('#btnBack'), !home);
@@ -680,7 +689,7 @@ function openFolder(id) {
   currentFolder = id; folderTab = 'csv'; showProcessed = false; procHistAll = false; query = ''; $('#q').value = ''; filterDana = ''; filterRek = ''; limit = 100;
   history.pushState({ f: id }, ''); renderAll(); window.scrollTo(0, 0);
 }
-$('#ftabs').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; folderTab = b.dataset.t; renderAll(); window.scrollTo(0, 0); });
+$('#ftabs').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; folderTab = b.dataset.t; filterDana = ''; filterRek = ''; limit = 100; renderAll(); window.scrollTo(0, 0); });
 $('#btnBack').onclick = () => { if (history.state && history.state.f) history.back(); else { currentFolder = null; renderAll(); } };
 window.addEventListener('popstate', e => { currentFolder = (e.state && e.state.f) || null; folderTab = 'csv'; query = ''; $('#q').value = ''; filterDana = ''; filterRek = ''; renderAll(); });
 
@@ -751,15 +760,20 @@ async function deleteFolder(f) {
 /* ================= Render ================= */
 function rekOf(kode) {
   const k = '-' + String(kode || '').toUpperCase() + '-';
+  if (k.includes('-GR-PRK-')) return 'GR-PRK';
   if (k.includes('-P-PRK-')) return 'P-PRK';
   if (k.includes('-U-O-')) return 'U-O';
   return 'Lainnya';
 }
-const REK_LABEL = { 'P-PRK': 'P-PRK (Penampungan)', 'U-O': 'U-O (Operasional)', 'Lainnya': 'Lainnya' };
+const REK_LABEL = { 'P-PRK': 'P-PRK (Penampungan)', 'U-O': 'U-O (Operasional)', 'GR-PRK': 'GR-PRK (PMH)', 'Lainnya': 'Lainnya' };
+// Rincian Kode dibagi dua: KGI (rekening P & U, jenis PRK & O) dan PMH (rekening GR, jenis PRK)
+const tplOf = kode => rekOf(kode) === 'GR-PRK' ? 'PMH' : 'KGI';
+const kodeTpl = () => folderTab === 'pmh' ? 'PMH' : 'KGI';
 function haystack(r) { return (r.kode + ' ' + r.kontak + ' ' + r.dana + ' ' + r.keterangan + ' ' + jAll(r).join(' ')).toLowerCase(); }
 
 function render() {
-  const all = inFolder();
+  const full = inFolder(), tpl = kodeTpl();
+  const all = full.filter(r => tplOf(r.kode) === tpl);
   // chips
   const counts = {};
   all.forEach(r => { const k = r.dana || '(tanpa dana)'; counts[k] = (counts[k] || 0) + 1; });
@@ -771,13 +785,13 @@ function render() {
   // klasifikasi rekening (dari pola kode)
   const rc = {}; all.forEach(r => { const k = rekOf(r.kode); rc[k] = (rc[k] || 0) + 1; });
   if (filterRek && !rc[filterRek]) filterRek = '';
-  $('#chips2').innerHTML =
+  $('#chips2').innerHTML = tpl === 'PMH' ? '' :
     '<button class="chip ' + (!filterRek ? 'on' : '') + '" data-r="">Semua rekening</button>' +
     ['P-PRK', 'U-O', 'Lainnya'].filter(k => rc[k]).map(k => '<button class="chip ' + (filterRek === k ? 'on' : '') + '" data-r="' + k + '">' + REK_LABEL[k] + '<small>' + rc[k] + '</small></button>').join('');
 
   // datalists
-  $('#dlDana').innerHTML = [...new Set(['Dana Masuk', 'Dana Keluar', 'Non-Kas', ...all.map(r => r.dana).filter(Boolean)])].map(v => '<option value="' + esc(v) + '">').join('');
-  $('#dlAkun').innerHTML = [...new Set(all.flatMap(jAll).filter(Boolean))].sort().map(v => '<option value="' + esc(v) + '">').join('');
+  $('#dlDana').innerHTML = [...new Set(['Dana Masuk', 'Dana Keluar', 'Non-Kas', ...full.map(r => r.dana).filter(Boolean)])].map(v => '<option value="' + esc(v) + '">').join('');
+  $('#dlAkun').innerHTML = [...new Set(full.flatMap(jAll).filter(Boolean))].sort().map(v => '<option value="' + esc(v) + '">').join('');
 
   // filter + search
   const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
@@ -793,7 +807,7 @@ function render() {
 
   const list = $('#list');
   if (loaded && !all.length) {
-    list.innerHTML = '<div class="empty"><img src="' + window.LOGO + '" alt=""><h3>Belum ada kode</h3><p>Mulai dengan impor file Excel,<br>atau tambah kode secara manual.</p><button class="btn primary" id="emptyImport" type="button">⬆ Impor Excel</button></div>';
+    list.innerHTML = '<div class="empty"><img src="' + window.LOGO + '" alt=""><h3>Belum ada kode ' + tpl + '</h3><p>Mulai dengan impor file Excel,<br>atau tambah kode secara manual' + (tpl === 'PMH' ? ' (kode berawalan …-GR-PRK-…)' : '') + '.</p><button class="btn primary" id="emptyImport" type="button">⬆ Impor Excel</button></div>';
     return;
   }
   if (loaded && !rows.length) { list.innerHTML = '<div class="empty"><h3>Tidak ditemukan</h3><p>Coba kata kunci lain.</p></div>'; return; }
@@ -890,6 +904,7 @@ function openForm(rec) {
   $('#formMsg').textContent = '';
   showPairs(Math.max(2, ...JPAIRS.filter(n => rec && (rec['debit' + n] || rec['kredit' + n]))));
   showAPairs(Math.max(1, ...APAIRS.filter(n => rec && (rec['amDebit' + n] || rec['amKredit' + n]))));
+  $('#fKode').placeholder = folderTab === 'pmh' ? 'CR-GR-PRK-XXXX' : 'CR-P-PRK-XXXX';
   show($('#ovForm'), true);
   setTimeout(() => $('#fKode').focus(), 50);
 }
@@ -1102,8 +1117,9 @@ $('#histList').addEventListener('click', async e => {
 /* ================= Impor CSV mutasi rekening ================= */
 // Pemetaan nomor rekening -> Kode Rekening, dan Kode Rekening -> Kode Jenis (ubah di sini bila ada rekening baru)
 const REK_MAP = { '0184845888': 'P', '0184191888': 'U' };
-const JENIS_MAP = { P: 'PRK', U: 'O' };
+const JENIS_MAP = { P: 'PRK', U: 'O', GR: 'PRK' };
 const fmtRp = new Intl.NumberFormat('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+let csvTpl = 'KGI';
 let csvFilter = '', csvQuery = '', csvSort = 'desc', csvLimit = 100, csvPending = false;
 
 function parseCsv(text) {
@@ -1282,7 +1298,7 @@ function renderCsv() {
       const full = lineFull(t, l);
       const reg = full ? (known.has(full.toUpperCase()) ? '<span class="reg" style="color:var(--in-fg)">✓ ada di daftar kode</span>' : '<span class="reg" style="color:var(--warn)">⚠ belum ada di daftar kode</span><button type="button" class="addk" data-add-code="' + esc(full) + '">＋ Tambah kode</button>') : '';
       const rekEl = i === 0
-        ? '<select class="seg ' + (t.rek ? '' : 'need') + '" data-rek title="Kode Rekening"><option value="">?</option><option value="P"' + (t.rek === 'P' ? ' selected' : '') + '>P</option><option value="U"' + (t.rek === 'U' ? ' selected' : '') + '>U</option></select>'
+        ? '<select class="seg ' + (t.rek ? '' : 'need') + '" data-rek title="Kode Rekening"><option value="">?</option><option value="P"' + (t.rek === 'P' ? ' selected' : '') + '>P</option><option value="U"' + (t.rek === 'U' ? ' selected' : '') + '>U</option><option value="GR"' + (t.rek === 'GR' ? ' selected' : '') + '>GR</option></select>'
         : '<span class="seg ' + (t.rek ? '' : 'need') + '" title="Kode Rekening">' + (esc(t.rek) || '?') + '</span>';
       return '<div class="ln" data-i="' + i + '"><div class="build"><span class="seg ' + cls + '" title="Kode Dana">' + esc(t.dana) + '</span><i>-</i>' + rekEl + '<i>-</i>' +
         '<span class="seg" title="Kode Jenis">' + (esc(txJenis(t)) || '…') + '</span><i>-</i>' +
@@ -1428,11 +1444,16 @@ let cqT;
 $('#cq').addEventListener('input', e => { clearTimeout(cqT); cqT = setTimeout(() => { csvQuery = e.target.value.trim(); csvLimit = 100; renderCsv(); }, 150); });
 
 /* --- impor / hapus / ekspor --- */
-$('#btnCsv').onclick = () => { if (!loaded || !mutasiLoaded) return toast('Data masih dimuat, tunggu sebentar…'); $('#csvFile').click(); };
+$('#btnCsv').onclick = () => { if (!loaded || !mutasiLoaded) return toast('Data masih dimuat, tunggu sebentar…'); show($('#ovCsvTpl'), true); };
+$('#ovCsvTpl').addEventListener('click', e => {
+  if (e.target.id === 'ovCsvTpl' || e.target.closest('#ctCancel')) return show($('#ovCsvTpl'), false);
+  const b = e.target.closest('[data-ct]'); if (!b) return;
+  csvTpl = b.dataset.ct; show($('#ovCsvTpl'), false); $('#csvFile').click();
+});
 $('#csvFile').addEventListener('change', async e => {
   const files = [...e.target.files]; e.target.value = ''; if (!files.length) return;
   if (!navigator.onLine) return toast('Tidak ada koneksi internet.', 3500);
-  const fk = txFolderKey();
+  const fk = txFolderKey(), tpl = csvTpl;
   const seen = new Set(mutasi.keys());
   const stamp = Date.now().toString(36);
   let fi = 0, added = 0, dup = 0, skipped = 0, bad = [], unknown = new Set();
@@ -1442,7 +1463,8 @@ $('#csvFile').addEventListener('change', async e => {
       const res = parseMutasi(parseCsv(await f.text()));
       if (!res.rows.length) { bad.push(f.name); continue; }
       skipped += res.skipped;
-      if (!REK_MAP[res.rekening]) unknown.add(res.rekening || '(tidak terbaca)');
+      if (tpl === 'PMH') res.rows.forEach(r => { r.rek = 'GR'; });      // rincian kode PMH: rekening GR, jenis PRK
+      else if (!REK_MAP[res.rekening]) unknown.add(res.rekening || '(tidak terbaca)');
       const iid = 'c' + stamp + (fi++).toString(36);
       const fresh = [];
       res.rows.forEach(r => { const id = fk + '__' + r.hash; if (seen.has(id)) dup++; else { seen.add(id); fresh.push({ id, r }); } });
@@ -1492,7 +1514,9 @@ function pairRows(rec, base, nums, kd, kk, kp, needCode) {
 // tpl: 'KGI' (CSV, kode akun) atau 'PMH' (Excel, nama akun)
 function buildJournal(tpl, prefix, start) {
   const needCode = tpl !== 'PMH';
-  const all = txInFolder().filter(t => !t.procId).sort((a, b) => String(a.rekening || '').localeCompare(String(b.rekening || '')) || (a.tanggalISO || '').localeCompare(b.tanggalISO || '') || (a.seq || 0) - (b.seq || 0));
+  const pendAll = txInFolder().filter(t => !t.procId);
+  const mine = t => (t.rek === 'GR') === (tpl === 'PMH');   // KGI = rekening P/U, PMH = rekening GR
+  const all = pendAll.filter(mine).sort((a, b) => String(a.rekening || '').localeCompare(String(b.rekening || '')) || (a.tanggalISO || '').localeCompare(b.tanggalISO || '') || (a.seq || 0) - (b.seq || 0));
   const codeRec = new Map(); inFolder().forEach(c => { const k = String(c.kode).toUpperCase(); if (!codeRec.has(k)) codeRec.set(k, c); });
   const problems = [], seenP = new Set(), main = [], am = [];
   const prob = (t, msg) => { const m = t.tanggal + ' · ' + t.jumlahRaw + ' · ' + String(t.keterangan || '').slice(0, 45) + ' — ' + msg; if (!seenP.has(m)) { seenP.add(m); problems.push(m); } };
@@ -1535,7 +1559,7 @@ function buildJournal(tpl, prefix, start) {
     sd += Math.round(r.d * 100); sk += Math.round(r.c * 100);
     recs.push({ no: numOf(i), tgl: j.tgl, acc: r.acc, name: r.name, ket: j.ket, kt: r.kt, d: r.d, c: r.c, memo: j.memo, am: j.am, tag: r.tag });
   }));
-  return { problems, nMain: main.length, nAm: am.length, recs, total: sd / 100, balanced: sd === sk, first: journals.length ? String(numOf(0)) : '', lastNo: journals.length ? String(numOf(journals.length - 1)) : '', count: journals.length, nTx: all.length, ids: all.map(t => t.id) };
+  return { problems, nMain: main.length, nAm: am.length, recs, total: sd / 100, balanced: sd === sk, first: journals.length ? String(numOf(0)) : '', lastNo: journals.length ? String(numOf(journals.length - 1)) : '', count: journals.length, nTx: all.length, nOther: pendAll.length - all.length, ids: all.map(t => t.id) };
 }
 const csvCell = v => { v = String(v ?? ''); return /[",\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
 const KGI_HEAD = '*TransactionNumber,*TransactionDate,*AccountCode,Description,*Debit,*Credit,Memo,Tags (use ; to separate tags)';
@@ -1566,9 +1590,10 @@ function refreshProc() {
   const ok = !r.problems.length && r.count > 0 && !badStart && r.balanced;
   $('#pNote').textContent = badStart ? 'Nomor awal harus berupa angka.' :
     r.problems.length ? 'Perbaiki ' + r.problems.length + ' transaksi di atas dulu (kode, daftar kode, atau jurnal kodenya), lalu buka Proses Semuanya lagi.' :
-    !r.count ? 'Belum ada jurnal yang dapat dibuat.' :
+    !r.count ? 'Belum ada transaksi rekening ' + (procTpl === 'PMH' ? 'GR' : 'P/U') + ' yang bisa diproses dengan template ini.' + (r.nOther ? ' (' + r.nOther + ' transaksi rekening ' + (procTpl === 'PMH' ? 'P/U' : 'GR') + ' memakai template ' + (procTpl === 'PMH' ? 'KGI' : 'PMH') + ')' : '') :
     'Nomor ' + r.first + (r.count > 1 ? ' s.d. ' + r.lastNo : '') + ' · ' + r.count + ' jurnal · total debit = total kredit Rp ' + fmtRp.format(r.total) +
-    (r.nAm ? ' · ' + r.nAm + ' jurnal amortisasi ditaruh di bagian akhir' + (procTpl === 'PMH' ? " (kolom Sumber = Jurnal Amortisasi)." : ' (kolom Memo berisi urutannya).') : '.');
+    (r.nAm ? ' · ' + r.nAm + ' jurnal amortisasi ditaruh di bagian akhir' + (procTpl === 'PMH' ? " (kolom Sumber = Jurnal Amortisasi)." : ' (kolom Memo berisi urutannya).') : '.') +
+    (r.nOther ? ' ' + r.nOther + ' transaksi rekening ' + (procTpl === 'PMH' ? 'P/U' : 'GR') + ' tidak ikut — proses dengan template ' + (procTpl === 'PMH' ? 'KGI' : 'PMH') + '.' : '');
   $('#pGo').disabled = !ok;
 }
 function loadProcDefaults() {
@@ -1710,7 +1735,8 @@ $('#btnCsvClear').onclick = async () => {
 /* ================= Ekspor ================= */
 $('#btnExport').onclick = () => {
   if (!window.XLSX) return toast('Library Excel belum termuat. Periksa koneksi internet.', 4000);
-  const all = inFolder().sort((a, b) => String(a.kode).localeCompare(String(b.kode), 'id', { numeric: true }));
+  const tplX = kodeTpl();
+  const all = inFolder().filter(r => tplOf(r.kode) === tplX).sort((a, b) => String(a.kode).localeCompare(String(b.kode), 'id', { numeric: true }));
   if (!all.length) return toast('Belum ada data untuk diekspor.');
   // urutan kolom sama seperti file asli, sehingga bisa diimpor ulang
   const maxJ = Math.max(2, ...all.flatMap(r => JPAIRS.filter(n => r['debit' + n] || r['kredit' + n])));
@@ -1722,7 +1748,7 @@ $('#btnExport').onclick = () => {
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   ws['!cols'] = [{ wch: 12 }, { wch: 30 }, { wch: 20 }, { wch: 60 }, { wch: 42 }, { wch: 42 }, { wch: 42 }, { wch: 42 }];
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Kode Transaksi');
-  XLSX.writeFile(wb, 'Essencode-' + (folderName(currentFolder).replace(/[^\w\- ]+/g, '').trim() || 'Rekap') + '.xlsx');
+  XLSX.writeFile(wb, 'Essencode-' + (folderName(currentFolder).replace(/[^\w\- ]+/g, '').trim() || 'Rekap') + '-' + tplX + '.xlsx');
   toast('File Excel diunduh');
 };
 
