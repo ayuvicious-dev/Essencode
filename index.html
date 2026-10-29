@@ -149,6 +149,47 @@ textarea.inp{resize:vertical;min-height:70px}
 .back{padding:6px 12px;font-size:16px;line-height:1.2}
 .brand span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:50vw}
 @media(max-width:520px){.who{display:none}}
+.ftabs{max-width:980px;margin:0 auto;padding:0 14px 8px;display:flex;gap:6px}
+.ftabs button{flex:1;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:8px;font-weight:700;color:var(--muted)}
+.ftabs button.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.csv-head{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px}
+.csv-head h2{margin:0 0 2px;font-size:18px;color:var(--brand)}
+.csv-head .sub{margin:0;color:var(--muted);font-size:13px;max-width:560px}
+.csv-actions{display:flex;gap:8px;flex-wrap:wrap}
+.csv-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
+.csv-tools .inp{flex:1 1 220px}
+.csv-tools .chips{padding:0}
+.tx{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:13px 14px;margin-bottom:10px;box-shadow:var(--shadow)}
+.tx1{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.tgl{font-weight:700}
+.tgl small{color:var(--muted);font-weight:500;margin-left:6px}
+.amt{font-weight:800;font-variant-numeric:tabular-nums}
+.amt.cr{color:var(--in-fg)} .amt.db{color:var(--out-fg)}
+.tx .ket{margin:5px 0 0;font-size:13.5px;word-break:break-word}
+.build{display:flex;align-items:center;flex-wrap:wrap;gap:5px;margin-top:10px}
+.build i{font-style:normal;color:var(--muted);font-weight:700}
+.seg{display:inline-flex;align-items:center;justify-content:center;min-width:38px;padding:7px 10px;border-radius:10px;background:var(--soft);font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:800;font-size:13.5px;border:1px solid transparent}
+.seg.cr{background:var(--in-bg);color:var(--in-fg)} .seg.db{background:var(--out-bg);color:var(--out-fg)}
+select.seg{appearance:none;-webkit-appearance:none;cursor:pointer;text-align:center;padding-right:10px}
+select.seg.need{border-color:var(--danger);background:#fff3f1}
+.fwrap{position:relative;flex:1 1 150px;min-width:140px}
+.fwrap .inp{padding:7px 10px;font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:700;text-transform:uppercase}
+.sg{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:30;max-height:250px;overflow:auto;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 28px rgba(60,30,10,.22);min-width:260px}
+.si{padding:8px 11px;border-bottom:1px solid var(--line);cursor:pointer;font-size:13px}
+.si:last-child{border-bottom:0}
+.si:hover{background:var(--soft)}
+.si b{font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--brand)}
+.si span{display:block;font-weight:600}
+.si small{display:block;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.si .mt{display:inline;font-size:10.5px;font-weight:800;background:var(--in-bg);color:var(--in-fg);border-radius:999px;padding:1px 7px;margin-left:6px}
+.si.none{cursor:default;color:var(--muted)}
+.full{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:9px;padding:8px 10px;border-radius:11px;border:1px dashed var(--line);color:var(--muted);font-size:13px}
+.full.ok{border:1px solid var(--in-fg);background:var(--in-bg);color:var(--in-fg)}
+.full code{font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:800;font-size:14px}
+.full .ac{display:flex;gap:2px;align-items:center}
+.full .ac button{border:0;background:transparent;font-size:12.5px;font-weight:700;padding:5px 8px;border-radius:9px;color:inherit}
+.full .ac .del{color:var(--danger)}
+.reg{font-size:11px;font-weight:700;margin-right:6px}
 .note{font-size:12.5px;color:var(--muted);margin-top:10px}
 .bar{height:8px;background:var(--soft);border-radius:99px;overflow:hidden;margin-top:12px}
 .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--brand),var(--accent));transition:width .2s}
@@ -198,6 +239,7 @@ textarea.inp{resize:vertical;min-height:70px}
     <span class="who" id="who"></span>
     <button id="logout" class="btn" type="button" style="padding:7px 11px;font-size:13px">Keluar</button>
   </div>
+  <div class="ftabs hidden" id="ftabs"><button type="button" data-t="csv" class="on">Impor CSV</button><button type="button" data-t="kode">Rincian Kode</button></div>
   <div class="top-sub hidden" id="topSub">
     <div class="tools">
       <div class="search">
@@ -219,6 +261,23 @@ textarea.inp{resize:vertical;min-height:70px}
       <div id="folders"></div>
     </section>
     <section id="folderView" class="hidden">
+    <div id="csvView">
+      <div class="csv-head">
+        <div><h2>Impor CSV Mutasi</h2><p class="sub">Unggah CSV mutasi rekening dari bank. Kode Dana, Rekening, dan Jenis terisi otomatis; Kode Final dipilih dari kode di folder ini.</p></div>
+        <div class="csv-actions">
+          <button id="btnCsv" class="btn primary" type="button">⬆ Impor CSV</button>
+          <button id="btnCsvExport" class="btn" type="button">⬇ Ekspor hasil</button>
+        </div>
+        <input id="csvFile" type="file" accept=".csv,text/csv,.txt" class="hidden">
+      </div>
+      <div class="csv-tools">
+        <input id="cq" class="inp" type="search" placeholder="Cari keterangan atau kode…" autocomplete="off">
+        <div id="csvChips" class="chips"></div>
+      </div>
+      <div id="csvList"></div>
+      <div style="text-align:center;margin-top:8px"><button id="btnCsvClear" class="link" type="button" style="color:var(--danger)">Hapus semua transaksi CSV di folder ini</button></div>
+    </div>
+    <div id="kodeView" class="hidden">
     <div class="meta">
       <span id="count"></span>
       <select id="sort" aria-label="Urutkan">
@@ -229,6 +288,7 @@ textarea.inp{resize:vertical;min-height:70px}
       </select>
     </div>
     <div id="list"></div>
+    </div>
     </section>
   </main>
   <button id="btnAdd" class="btn primary fab hidden" type="button">＋ Tambah Kode</button>
@@ -407,13 +467,14 @@ $('#logout').onclick = () => { if (confirm('Keluar dari akun?')) signOut(auth); 
 let uid = null, unsub = null, loaded = false;
 let data = new Map();           // id -> record
 let imports = new Map();        // id -> riwayat impor
-let folders = new Map(), foldersLoaded = false, currentFolder = null;   // null = beranda, '__none' = kode lama tanpa folder
+let folders = new Map(), foldersLoaded = false, currentFolder = null;
+let mutasi = new Map(), mutasiLoaded = false, folderTab = 'csv';   // transaksi hasil impor CSV   // null = beranda, '__none' = kode lama tanpa folder
 let filterDana = '', filterRek = '', sortBy = 'kode', query = '', limit = 100;
 
 onAuthStateChanged(auth, user => {
   const sp = $('#splash'); if (sp) sp.remove();
   if (unsub) { unsub(); unsub = null; }
-  data = new Map(); imports = new Map(); folders = new Map(); loaded = false; foldersLoaded = false; currentFolder = null;
+  data = new Map(); imports = new Map(); folders = new Map(); mutasi = new Map(); loaded = false; foldersLoaded = false; mutasiLoaded = false; currentFolder = null; folderTab = 'csv';
   if (user) {
     uid = user.uid;
     $('#who').textContent = user.email || '';
@@ -438,7 +499,12 @@ onAuthStateChanged(auth, user => {
       snap.forEach(d => { const v = d.data(); m.set(d.id, { id: d.id, ...v }); });
       folders = m; foldersLoaded = true; renderAll();
     }, err => console.error(err));
-    unsub = () => { u1(); u2(); u3(); };
+    const u4 = onSnapshot(collection(db, 'users', uid, 'mutasi'), snap => {
+      const m = new Map();
+      snap.forEach(d => m.set(d.id, { id: d.id, ...d.data() }));
+      mutasi = m; mutasiLoaded = true; renderAll();
+    }, err => console.error(err));
+    unsub = () => { u1(); u2(); u3(); u4(); };
   } else {
     uid = null;
     show($('#app'), false); show($('#auth'), true);
@@ -462,15 +528,20 @@ const folderName = id => id === '__none' ? 'Tanpa folder' : ((folders.get(id) ||
 
 function applyView() {
   const home = currentFolder === null;
-  show($('#home'), home); show($('#folderView'), !home);
-  show($('#topSub'), !home); show($('#btnAdd'), !home); show($('#btnBack'), !home);
+  const kode = !home && folderTab === 'kode';
+  show($('#home'), home); show($('#folderView'), !home); show($('#ftabs'), !home);
+  show($('#csvView'), !home && folderTab === 'csv'); show($('#kodeView'), kode);
+  show($('#topSub'), kode); show($('#btnAdd'), kode); show($('#btnBack'), !home);
+  document.querySelectorAll('#ftabs button').forEach(b => b.classList.toggle('on', b.dataset.t === folderTab));
   $('#title').textContent = home ? 'Essencode' : folderName(currentFolder);
   document.title = home ? 'Essencode — Rekap Kode Transaksi' : folderName(currentFolder) + ' · Essencode';
 }
 function renderAll() {
   if (currentFolder && currentFolder !== '__none' && foldersLoaded && !folders.has(currentFolder)) currentFolder = null;
   applyView();
-  if (currentFolder === null) renderHome(); else render();
+  if (currentFolder === null) renderHome();
+  else if (folderTab === 'csv') { if (csvEditing()) csvPending = true; else renderCsv(); }
+  else render();
 }
 function renderHome() {
   const box = $('#folders');
@@ -488,11 +559,12 @@ function renderHome() {
   ).join('') + '</div>';
 }
 function openFolder(id) {
-  currentFolder = id; query = ''; $('#q').value = ''; filterDana = ''; filterRek = ''; limit = 100;
+  currentFolder = id; folderTab = 'csv'; query = ''; $('#q').value = ''; filterDana = ''; filterRek = ''; limit = 100;
   history.pushState({ f: id }, ''); renderAll(); window.scrollTo(0, 0);
 }
+$('#ftabs').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; folderTab = b.dataset.t; renderAll(); window.scrollTo(0, 0); });
 $('#btnBack').onclick = () => { if (history.state && history.state.f) history.back(); else { currentFolder = null; renderAll(); } };
-window.addEventListener('popstate', e => { currentFolder = (e.state && e.state.f) || null; query = ''; $('#q').value = ''; filterDana = ''; filterRek = ''; renderAll(); });
+window.addEventListener('popstate', e => { currentFolder = (e.state && e.state.f) || null; folderTab = 'csv'; query = ''; $('#q').value = ''; filterDana = ''; filterRek = ''; renderAll(); });
 
 $('#folders').addEventListener('click', e => {
   if (e.target.closest('#emptyFolder')) return openFolderForm(null);
@@ -549,7 +621,8 @@ async function deleteFolder(f) {
   const imps = [...imports.values()].filter(h => h.folderId === f.id);
   if (!confirm('Hapus folder "' + f.name + '"?\n\n' + codes.length + ' kode di dalamnya akan IKUT TERHAPUS dan tidak bisa dikembalikan.')) return;
   if (!navigator.onLine) return toast('Tidak ada koneksi internet.', 3500);
-  const refs = [...codes.map(r => doc(db, 'users', uid, 'codes', r.id)), ...imps.map(h => doc(db, 'users', uid, 'imports', h.id))];
+  const txs = [...mutasi.values()].filter(t => t.folderId === f.id);
+  const refs = [...codes.map(r => doc(db, 'users', uid, 'codes', r.id)), ...imps.map(h => doc(db, 'users', uid, 'imports', h.id)), ...txs.map(t => doc(db, 'users', uid, 'mutasi', t.id))];
   try {
     for (let i = 0; i < refs.length; i += 400) { const b = writeBatch(db); refs.slice(i, i + 400).forEach(rf => b.delete(rf)); await b.commit(); }
     const b = writeBatch(db); b.delete(doc(db, 'users', uid, 'folders', f.id)); await b.commit();
@@ -841,6 +914,247 @@ $('#histList').addEventListener('click', async e => {
     toast('Impor dihapus (' + rows.length + ' kode)', 3500);
   } catch (err) { console.error(err); toast('Gagal menghapus: ' + (err.code || err.message), 5000); b.disabled = false; }
 });
+
+/* ================= Impor CSV mutasi rekening ================= */
+// Pemetaan nomor rekening -> Kode Rekening, dan Kode Rekening -> Kode Jenis (ubah di sini bila ada rekening baru)
+const REK_MAP = { '0184845888': 'P', '0184191888': 'U' };
+const JENIS_MAP = { P: 'PRK', U: 'O' };
+const fmtRp = new Intl.NumberFormat('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+let csvFilter = '', csvQuery = '', csvLimit = 100, csvPending = false;
+
+function parseCsv(text) {
+  text = text.replace(/^\uFEFF/, '');
+  const rows = []; let row = [], f = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) { if (c === '"') { if (text[i + 1] === '"') { f += '"'; i++; } else q = false; } else f += c; }
+    else if (c === '"') q = true;
+    else if (c === ',') { row.push(f); f = ''; }
+    else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(f); f = ''; rows.push(row); row = []; }
+    else f += c;
+  }
+  if (f !== '' || row.length) { row.push(f); rows.push(row); }
+  return rows;
+}
+function parseAmount(str) {
+  let s = String(str || '').trim().replace(/[^\d.,-]/g, '');
+  if (!s) return NaN;
+  const lc = s.lastIndexOf(','), ld = s.lastIndexOf('.');
+  s = lc > ld ? s.replace(/\./g, '').replace(',', '.') : s.replace(/,/g, '');
+  return parseFloat(s);
+}
+function hashStr(str) {
+  let h1 = 0x811c9dc5, h2 = 0x9e3779b9;
+  for (let i = 0; i < str.length; i++) { const c = str.charCodeAt(i); h1 = Math.imul(h1 ^ c, 16777619); h2 = Math.imul(h2 ^ c, 2246822519) + i | 0; }
+  return (h1 >>> 0).toString(36) + (h2 >>> 0).toString(36);
+}
+function parseMutasi(rows) {
+  let rekening = '', hi = -1, col = {};
+  rows.forEach((r, i) => {
+    const line = r.join(' ');
+    const m = /No\.?\s*rekening\s*:\s*(\d+)/i.exec(line); if (m && !rekening) rekening = m[1];
+    if (hi < 0 && norm(r[0]).toLowerCase() === 'tanggal transaksi') {
+      hi = i; r.forEach((h, k) => { col[norm(h).toLowerCase()] = k; });
+    }
+  });
+  if (hi < 0) return { rows: [], rekening, skipped: 0 };
+  const out = []; let skipped = 0, seq = 0;
+  for (let i = hi + 1; i < rows.length; i++) {
+    const r = rows[i];
+    const tgl = norm(r[col['tanggal transaksi']]);
+    if (!/^\d{2}\/\d{2}\/\d{4}$/.test(tgl)) continue;     // lewati ringkasan/baris kosong
+    const jumlahRaw = norm(r[col['jumlah']]);
+    const mm = /^([\d.,]+)\s*([A-Za-z]{1,2})?$/.exec(jumlahRaw);
+    const amount = mm ? parseAmount(mm[1]) : NaN;
+    const sfx = mm && mm[2] ? mm[2].toUpperCase() : '';
+    const dana = ['CR', 'K', 'KR'].includes(sfx) ? 'CR' : ['DB', 'DR', 'D'].includes(sfx) ? 'DB' : '';
+    if (!dana || isNaN(amount)) { skipped++; continue; }
+    const [d, mo, y] = tgl.split('/');
+    const ket = norm(r[col['keterangan']]), saldo = norm(r[col['saldo']]), cabang = norm(r[col['cabang']]);
+    out.push({
+      tanggal: tgl, tanggalISO: y + '-' + mo + '-' + d, keterangan: ket, cabang, jumlah: amount, jumlahRaw, saldo,
+      dana, rekening, rek: REK_MAP[rekening] || '', final: '', seq: seq++,
+      hash: hashStr([rekening, tgl, ket, jumlahRaw, saldo].join('|'))
+    });
+  }
+  return { rows: out, rekening, skipped };
+}
+
+const txFolderKey = () => currentFolder === '__none' ? 'none' : currentFolder;
+const txInFolder = () => [...mutasi.values()].filter(t => (t.folderId || '__none') === currentFolder);
+const txJenis = t => JENIS_MAP[t.rek] || '';
+const txPrefix = t => (t.dana && t.rek) ? t.dana + '-' + t.rek + '-' + txJenis(t) + '-' : '';
+const txFull = t => (t.dana && t.rek && t.final) ? txPrefix(t) + t.final : '';
+const csvEditing = () => document.activeElement && document.activeElement.classList && document.activeElement.classList.contains('fin');
+
+async function patchTx(id, fields) {
+  try { const b = writeBatch(db); b.update(doc(db, 'users', uid, 'mutasi', id), fields); await b.commit(); }
+  catch (err) { toast('Gagal menyimpan: ' + (err.code || err.message), 4000); }
+}
+
+function renderCsv() {
+  const list = $('#csvList');
+  if (!loaded || !mutasiLoaded) { list.innerHTML = '<div class="empty"><p>Memuat data…</p></div>'; return; }
+  const all = txInFolder();
+  const isDone = t => !!txFull(t);
+  const nDone = all.filter(isDone).length;
+  $('#csvChips').innerHTML =
+    '<button class="chip ' + (!csvFilter ? 'on' : '') + '" data-c="">Semua<small>' + all.length + '</small></button>' +
+    '<button class="chip ' + (csvFilter === 'todo' ? 'on' : '') + '" data-c="todo">Belum lengkap<small>' + (all.length - nDone) + '</small></button>' +
+    '<button class="chip ' + (csvFilter === 'done' ? 'on' : '') + '" data-c="done">Sudah lengkap<small>' + nDone + '</small></button>';
+  $('#btnCsvClear').style.display = all.length ? '' : 'none';
+  if (!all.length) {
+    list.innerHTML = '<div class="empty"><img src="' + window.LOGO + '" alt=""><h3>Belum ada transaksi</h3><p>Impor file CSV mutasi rekening untuk memecahnya<br>menjadi tanggal, keterangan, dan kode transaksi.</p><button class="btn primary" id="emptyCsv" type="button">⬆ Impor CSV</button></div>';
+    return;
+  }
+  const terms = csvQuery.toLowerCase().split(/\s+/).filter(Boolean);
+  const known = new Set(inFolder().map(c => String(c.kode).toUpperCase()));
+  let rows = all.filter(t => (!csvFilter || (csvFilter === 'done') === isDone(t)) &&
+    terms.every(w => (t.keterangan + ' ' + t.tanggal + ' ' + txFull(t) + ' ' + t.jumlahRaw).toLowerCase().includes(w)));
+  rows.sort((a, b) => (b.tanggalISO || '').localeCompare(a.tanggalISO || '') || (a.seq || 0) - (b.seq || 0));
+  const shown = rows.slice(0, csvLimit);
+  if (!rows.length) { list.innerHTML = '<div class="empty"><h3>Tidak ditemukan</h3></div>'; return; }
+  list.innerHTML = shown.map(t => {
+    const full = txFull(t), cls = t.dana === 'CR' ? 'cr' : 'db', pre = txPrefix(t);
+    const reg = full ? (known.has(full.toUpperCase()) ? '<span class="reg" style="color:var(--in-fg)">✓ ada di daftar kode</span>' : '<span class="reg" style="color:var(--warn)">⚠ belum ada di daftar kode</span>') : '';
+    return '<article class="tx" data-id="' + esc(t.id) + '">' +
+      '<div class="tx1"><span class="tgl">' + esc(t.tanggal) + '<small>…' + esc(String(t.rekening || '').slice(-4)) + '</small></span>' +
+      '<span class="amt ' + cls + '">' + (t.dana === 'CR' ? '+ ' : '− ') + fmtRp.format(t.jumlah) + '</span></div>' +
+      '<p class="ket">' + esc(t.keterangan) + '</p>' +
+      '<div class="build"><span class="seg ' + cls + '" title="Kode Dana">' + esc(t.dana) + '</span><i>-</i>' +
+      '<select class="seg ' + (t.rek ? '' : 'need') + '" data-rek title="Kode Rekening"><option value="">?</option><option value="P"' + (t.rek === 'P' ? ' selected' : '') + '>P</option><option value="U"' + (t.rek === 'U' ? ' selected' : '') + '>U</option></select><i>-</i>' +
+      '<span class="seg" title="Kode Jenis">' + (esc(txJenis(t)) || '…') + '</span><i>-</i>' +
+      '<div class="fwrap"><input class="inp fin" autocomplete="off" spellcheck="false" placeholder="Kode final (cari…)" value="' + esc(t.final || '') + '"><div class="sg hidden"></div></div></div>' +
+      '<div class="full ' + (full ? 'ok' : '') + '">' + (full ? '<code>' + esc(full) + '</code>' : '<span>' + (t.rek ? 'Pilih / ketik kode final untuk melengkapi kode' : 'Pilih kode rekening (P / U) dulu') + '</span>') +
+      '<div class="ac">' + reg + (full ? '<button type="button" data-copy-tx="' + esc(full) + '">Salin</button>' : '') + '<button type="button" class="del" data-del-tx>Hapus</button></div></div>' +
+      '</article>';
+  }).join('') + (rows.length > csvLimit ? '<button class="btn more" id="moreCsv" type="button">Tampilkan lebih banyak (' + (rows.length - csvLimit) + ')</button>' : '');
+}
+
+/* --- saran kode final (pencarian kode) --- */
+function suggestFor(t, qtext) {
+  const pre = txPrefix(t);
+  let c = inFolder();
+  if (!pre) return { pre, items: [] };
+  c = c.filter(x => String(x.kode).toUpperCase().startsWith(pre));
+  const terms = qtext.toLowerCase().split(/\s+/).filter(Boolean);
+  c = c.filter(x => terms.every(w => haystack(x).includes(w)));
+  const ket = String(t.keterangan || '').toLowerCase();
+  const stop = new Set(['pt', 'cv', 'tbk', 'yayasan', 'bu', 'pak']);
+  const scored = c.map(x => {
+    const toks = norm(x.kontak).toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length >= 3 && !stop.has(w));
+    return { x, score: toks.filter(w => ket.includes(w)).length };
+  }).sort((a, b) => b.score - a.score || String(a.x.kode).localeCompare(String(b.x.kode)));
+  return { pre, items: scored };
+}
+function showSugg(card, typed) {
+  const t = mutasi.get(card.dataset.id); if (!t) return;
+  const inp = card.querySelector('.fin'), box = card.querySelector('.sg');
+  const { pre, items } = suggestFor(t, typed ? inp.value.replace(pre0(t), '') : '');
+  document.querySelectorAll('#csvList .sg').forEach(b => { if (b !== box) b.classList.add('hidden'); });
+  if (!pre) { box.innerHTML = '<div class="si none">Pilih kode rekening (P / U) dulu.</div>'; }
+  else if (!items.length) { box.innerHTML = '<div class="si none">Tidak ada kode berawalan <b>' + esc(pre) + '</b>' + (typed && inp.value ? ' yang cocok' : ' di folder ini') + '. Anda bisa mengetik kode final secara manual.</div>'; }
+  else {
+    box.innerHTML = items.slice(0, 40).map(({ x, score }) =>
+      '<div class="si" data-code="' + esc(String(x.kode).toUpperCase()) + '"><b>' + esc(String(x.kode).toUpperCase()) + '</b>' + (score ? '<em class="mt">cocok</em>' : '') +
+      '<span>' + esc(x.kontak || '-') + '</span><small>' + esc(x.keterangan || '') + '</small></div>').join('');
+  }
+  box.classList.remove('hidden');
+}
+const pre0 = t => txPrefix(t);
+function normFinal(t, v) {
+  v = String(v || '').toUpperCase().replace(/\s+/g, '');
+  const pre = txPrefix(t);
+  return pre && v.startsWith(pre) ? v.slice(pre.length) : v;
+}
+
+$('#csvList').addEventListener('focusin', e => { if (e.target.classList.contains('fin')) showSugg(e.target.closest('.tx'), false); });
+$('#csvList').addEventListener('input', e => { if (e.target.classList.contains('fin')) showSugg(e.target.closest('.tx'), true); });
+$('#csvList').addEventListener('focusout', e => {
+  if (!e.target.classList.contains('fin')) return;
+  setTimeout(() => {
+    document.querySelectorAll('#csvList .sg').forEach(b => b.classList.add('hidden'));
+    if (csvPending && !csvEditing()) { csvPending = false; renderCsv(); }
+  }, 200);
+});
+$('#csvList').addEventListener('keydown', e => { if (e.target.classList.contains('fin') && e.key === 'Enter') e.target.blur(); });
+$('#csvList').addEventListener('change', e => {
+  const card = e.target.closest('.tx'); if (!card) return;
+  const t = mutasi.get(card.dataset.id); if (!t) return;
+  if (e.target.classList.contains('fin')) { const v = normFinal(t, e.target.value); if (v !== (t.final || '')) patchTx(t.id, { final: v }); }
+  if (e.target.matches('[data-rek]')) patchTx(t.id, { rek: e.target.value });
+});
+$('#csvList').addEventListener('mousedown', e => {
+  const si = e.target.closest('.si[data-code]'); if (!si) return;
+  e.preventDefault();
+  const card = si.closest('.tx'), t = mutasi.get(card.dataset.id), inp = card.querySelector('.fin');
+  const fin = si.dataset.code.slice(txPrefix(t).length);
+  inp.value = fin; inp.blur();
+  if (fin !== (t.final || '')) patchTx(t.id, { final: fin });
+});
+$('#csvList').addEventListener('touchstart', e => { /* biarkan scroll daftar saran */ }, { passive: true });
+$('#csvList').addEventListener('click', async e => {
+  if (e.target.closest('#emptyCsv')) return $('#btnCsv').click();
+  if (e.target.closest('#moreCsv')) { csvLimit += 100; renderCsv(); return; }
+  const cp = e.target.closest('[data-copy-tx]');
+  if (cp) {
+    try { await navigator.clipboard.writeText(cp.dataset.copyTx); }
+    catch { const x = document.createElement('textarea'); x.value = cp.dataset.copyTx; document.body.appendChild(x); x.select(); document.execCommand('copy'); x.remove(); }
+    return toast('Kode disalin: ' + cp.dataset.copyTx, 1500);
+  }
+  const del = e.target.closest('[data-del-tx]');
+  if (del) {
+    const t = mutasi.get(del.closest('.tx').dataset.id); if (!t) return;
+    if (!confirm('Hapus transaksi tanggal ' + t.tanggal + ' (' + t.jumlahRaw + ')?')) return;
+    try { const b = writeBatch(db); b.delete(doc(db, 'users', uid, 'mutasi', t.id)); await b.commit(); toast('Transaksi dihapus'); }
+    catch (err) { toast('Gagal menghapus: ' + (err.code || err.message), 4000); }
+  }
+});
+$('#csvChips').addEventListener('click', e => { const b = e.target.closest('.chip'); if (!b) return; csvFilter = b.dataset.c; csvLimit = 100; renderCsv(); });
+let cqT;
+$('#cq').addEventListener('input', e => { clearTimeout(cqT); cqT = setTimeout(() => { csvQuery = e.target.value.trim(); csvLimit = 100; renderCsv(); }, 150); });
+
+/* --- impor / hapus / ekspor --- */
+$('#btnCsv').onclick = () => { if (!loaded || !mutasiLoaded) return toast('Data masih dimuat, tunggu sebentar…'); $('#csvFile').click(); };
+$('#csvFile').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try {
+    const res = parseMutasi(parseCsv(await f.text()));
+    if (!res.rows.length) return toast('Tidak ada transaksi terbaca. Pastikan file CSV mutasi rekening (ada kolom "Tanggal Transaksi").', 5500);
+    const fk = txFolderKey();
+    const seen = new Set(mutasi.keys()); const fresh = []; let dup = 0;
+    res.rows.forEach(r => { const id = fk + '__' + r.hash; if (seen.has(id)) dup++; else { seen.add(id); fresh.push({ id, r }); } });
+    if (!navigator.onLine && fresh.length) return toast('Tidak ada koneksi internet.', 3500);
+    for (let i = 0; i < fresh.length; i += 400) {
+      const b = writeBatch(db);
+      fresh.slice(i, i + 400).forEach(({ id, r }) => b.set(doc(db, 'users', uid, 'mutasi', id), { ...r, folderId: currentFolder === '__none' ? null : currentFolder, fileName: f.name, importedAt: serverTimestamp() }));
+      await b.commit();
+    }
+    let msg = fresh.length + ' transaksi ditambahkan' + (dup ? ', ' + dup + ' sudah ada (dilewati)' : '') + (res.skipped ? ', ' + res.skipped + ' baris tidak terbaca' : '') + '.';
+    if (!REK_MAP[res.rekening]) msg += ' Rekening ' + (res.rekening || '(tidak terbaca)') + ' belum dikenal — pilih kode rekening manual.';
+    toast(msg, 6000);
+  } catch (err) { console.error(err); toast('Gagal membaca CSV: ' + (err.message || err), 5000); }
+});
+$('#btnCsvClear').onclick = async () => {
+  const rows = txInFolder(); if (!rows.length) return;
+  if (!confirm('Hapus semua ' + rows.length + ' transaksi CSV di folder ini?\n\nKode di Rincian Kode tidak terpengaruh. Tindakan ini tidak bisa dikembalikan.')) return;
+  try {
+    for (let i = 0; i < rows.length; i += 400) { const b = writeBatch(db); rows.slice(i, i + 400).forEach(t => b.delete(doc(db, 'users', uid, 'mutasi', t.id))); await b.commit(); }
+    toast('Transaksi CSV dihapus');
+  } catch (err) { toast('Gagal menghapus: ' + (err.code || err.message), 5000); }
+};
+$('#btnCsvExport').onclick = () => {
+  if (!window.XLSX) return toast('Library Excel belum termuat. Periksa koneksi internet.', 4000);
+  const rows = txInFolder().sort((a, b) => (a.tanggalISO || '').localeCompare(b.tanggalISO || '') || (a.seq || 0) - (b.seq || 0));
+  if (!rows.length) return toast('Belum ada transaksi untuk diekspor.');
+  const aoa = [['Tanggal Transaksi', 'Keterangan', 'Jumlah', 'Kode Dana', 'Kode Rekening', 'Kode Jenis', 'Kode Final', 'Kode Lengkap']];
+  rows.forEach(t => aoa.push([t.tanggal, t.keterangan, (t.dana === 'DB' ? -1 : 1) * t.jumlah, t.dana, t.rek, txJenis(t), t.final || '', txFull(t)]));
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{ wch: 16 }, { wch: 70 }, { wch: 18 }, { wch: 10 }, { wch: 14 }, { wch: 11 }, { wch: 12 }, { wch: 20 }];
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Mutasi');
+  XLSX.writeFile(wb, 'Essencode-Mutasi-' + (folderName(currentFolder).replace(/[^\w\- ]+/g, '').trim() || 'Rekap') + '.xlsx');
+  toast('File Excel diunduh');
+};
 
 /* ================= Ekspor ================= */
 $('#btnExport').onclick = () => {
