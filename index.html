@@ -167,6 +167,9 @@ textarea.inp{resize:vertical;min-height:70px}
 .amt{font-weight:800;font-variant-numeric:tabular-nums}
 .amt.cr{color:var(--in-fg)} .amt.db{color:var(--out-fg)}
 .tx .ket{margin:5px 0 0;font-size:13.5px;word-break:break-word}
+.tx .ket{cursor:text;touch-action:manipulation}
+.tx .ket-edit{width:100%;margin:5px 0 0;font-size:13.5px;min-height:56px;resize:vertical;line-height:1.4}
+.tx .ket-hint{font-size:11px;color:var(--muted);margin:2px 0 0}
 .build{display:flex;align-items:center;flex-wrap:wrap;gap:5px;margin-top:10px}
 .build i{font-style:normal;color:var(--muted);font-weight:700}
 .seg{display:inline-flex;align-items:center;justify-content:center;min-width:38px;padding:7px 10px;border-radius:10px;background:var(--soft);font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:800;font-size:13.5px;border:1px solid transparent}
@@ -1196,7 +1199,7 @@ function saveLines(t, lines) {
   const cl = lines.map(l => ({ final: l.final || '', amt: (l.amt === '' || l.amt == null || isNaN(l.amt)) ? '' : Number(l.amt) }));
   return patchTx(t.id, { codes: cl, final: cl[0].final });
 }
-const csvEditing = () => document.activeElement && document.activeElement.classList && (document.activeElement.classList.contains('fin') || document.activeElement.classList.contains('nom'));
+const csvEditing = () => document.activeElement && document.activeElement.classList && (document.activeElement.classList.contains('fin') || document.activeElement.classList.contains('nom') || document.activeElement.classList.contains('ket-edit'));
 
 async function patchTx(id, fields) {
   try { const b = writeBatch(db); b.update(doc(db, 'users', uid, 'mutasi', id), fields); await b.commit(); }
@@ -1314,7 +1317,7 @@ function renderCsv() {
     return '<article class="tx" data-id="' + esc(t.id) + '">' +
       '<div class="tx1"><span class="tgl">' + esc(t.tanggal) + '<small>…' + esc(String(t.rekening || '').slice(-4)) + '</small></span>' +
       '<span class="amt ' + cls + '">' + (t.dana === 'CR' ? '+ ' : '− ') + fmtRp.format(t.jumlah) + '</span></div>' +
-      '<p class="ket">' + esc(t.keterangan) + '</p>' + lineHtml +
+      '<p class="ket" data-ket title="Klik 2x untuk edit keterangan">' + esc(t.keterangan) + '</p>' + lineHtml +
       '<div class="tfoot"><button type="button" class="link" data-add-line>＋ Tambah kode lain</button>' + sisa + '<span class="sp"></span><button type="button" class="link" style="color:var(--danger)" data-del-tx>Hapus transaksi</button></div>' +
       '</article>';
   }).join('') + (rows.length > csvLimit ? '<button class="btn more" id="moreCsv" type="button">Tampilkan lebih banyak (' + (rows.length - csvLimit) + ')</button>' : '');
@@ -1437,6 +1440,33 @@ $('#csvList').addEventListener('click', async e => {
     try { const b = writeBatch(db); b.delete(doc(db, 'users', uid, 'mutasi', t.id)); await b.commit(); toast('Transaksi dihapus'); }
     catch (err) { toast('Gagal menghapus: ' + (err.code || err.message), 4000); }
   }
+});
+/* --- klik 2x pada keterangan transaksi = edit teks --- */
+$('#csvList').addEventListener('dblclick', e => {
+  const p = e.target.closest('p[data-ket]'); if (!p) return;
+  const card = p.closest('.tx'), t = card && mutasi.get(card.dataset.id); if (!t) return;
+  if (window.getSelection) window.getSelection().removeAllRanges();
+  const ta = document.createElement('textarea');
+  ta.className = 'inp ket-edit'; ta.value = t.keterangan || ''; ta.spellcheck = false;
+  p.replaceWith(ta);
+  const fit = () => { ta.style.height = 'auto'; ta.style.height = Math.max(56, ta.scrollHeight + 2) + 'px'; };
+  fit(); ta.addEventListener('input', fit);
+  ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
+  let done = false;
+  const finish = async save => {
+    if (done) return; done = true;
+    const v = ta.value.replace(/\s+/g, ' ').trim();
+    if (save && v !== (t.keterangan || '')) {
+      if (!v) { toast('Keterangan tidak boleh kosong'); }
+      else { await patchTx(t.id, { keterangan: v }); toast('Keterangan diperbarui'); }
+    }
+    csvPending = false; renderCsv();
+  };
+  ta.addEventListener('keydown', ev => {
+    if (ev.key === 'Escape') { ev.preventDefault(); finish(false); }
+    else if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); finish(true); }
+  });
+  ta.addEventListener('blur', () => finish(true));
 });
 $('#csvChips').addEventListener('click', e => { const b = e.target.closest('.chip'); if (!b) return; csvFilter = b.dataset.c; csvLimit = 100; renderCsv(); });
 $('#csvSort').onchange = e => { csvSort = e.target.value; csvLimit = 100; renderCsv(); };
