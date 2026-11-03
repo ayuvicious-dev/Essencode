@@ -1151,6 +1151,10 @@ function hashStr(str) {
   for (let i = 0; i < str.length; i++) { const c = str.charCodeAt(i); h1 = Math.imul(h1 ^ c, 16777619); h2 = Math.imul(h2 ^ c, 2246822519) + i | 0; }
   return (h1 >>> 0).toString(36) + (h2 >>> 0).toString(36);
 }
+function todayDMY() {      // tanggal hari ini (zona waktu perangkat) format dd/mm/yyyy
+  const n = new Date();
+  return String(n.getDate()).padStart(2, '0') + '/' + String(n.getMonth() + 1).padStart(2, '0') + '/' + n.getFullYear();
+}
 function parseMutasi(rows) {
   let rekening = '', hi = -1, col = {};
   rows.forEach((r, i) => {
@@ -1164,7 +1168,9 @@ function parseMutasi(rows) {
   const out = []; let skipped = 0, seq = 0;
   for (let i = hi + 1; i < rows.length; i++) {
     const r = rows[i];
-    const tgl = norm(r[col['tanggal transaksi']]);
+    const tglRaw = norm(r[col['tanggal transaksi']]);
+    const pend = /^PEND$/i.test(tglRaw);                    // transaksi pending: tanggal diisi tanggal hari ini
+    const tgl = pend ? todayDMY() : tglRaw;
     if (!/^\d{2}\/\d{2}\/\d{4}$/.test(tgl)) continue;     // lewati ringkasan/baris kosong
     const jumlahRaw = norm(r[col['jumlah']]);
     const mm = /^([\d.,]+)\s*([A-Za-z]{1,2})?$/.exec(jumlahRaw);
@@ -1177,7 +1183,7 @@ function parseMutasi(rows) {
     out.push({
       tanggal: tgl, tanggalISO: y + '-' + mo + '-' + d, keterangan: ket, cabang, jumlah: amount, jumlahRaw, saldo,
       dana, rekening, rek: REK_MAP[rekening] || '', final: '', seq: seq++,
-      hash: hashStr([rekening, tgl, ket, jumlahRaw, saldo].join('|'))
+      pend, hash: hashStr([rekening, pend ? 'PEND' : tgl, ket, jumlahRaw, saldo].join('|'))   // PEND di-hash apa adanya agar impor ulang tidak dobel
     });
   }
   return { rows: out, rekening, skipped };
