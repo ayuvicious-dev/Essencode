@@ -253,6 +253,9 @@ select.seg.need{border-color:var(--danger);background:#fff3f1}
 #procHint.ready{color:var(--in-fg);font-weight:700}
 .phbox{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 14px;margin-bottom:12px;box-shadow:var(--shadow)}
 .ph-h{font-weight:800;color:var(--brand);font-size:14px;display:flex;align-items:center;gap:6px;width:100%;background:none;border:0;padding:2px 0;cursor:pointer;text-align:left;font-family:inherit;-webkit-tap-highlight-color:transparent}
+.btn.appr{color:var(--ok);border-color:var(--ok);background:var(--card)}
+.btn.appr.on{background:var(--ok);color:#fff}
+.hi .apd{color:var(--ok);font-weight:700}
 .ph-h .ph-n{font-weight:600;color:var(--muted);font-size:12px}
 .ph-h .ph-c{margin-left:auto;color:var(--muted);transition:transform .2s}
 .ph-h.open .ph-c{transform:rotate(180deg)}
@@ -1261,6 +1264,8 @@ const txFull = t => txFulls(t).join(' ');
 const txDone = t => txLines(t).every(l => lineFull(t, l));
 const parseIdAmt = v => { const n = parseFloat(String(v || '').replace(/[^\d.,]/g, '').replace(/\./g, '').replace(',', '.')); return isNaN(n) ? '' : n; };
 let focusLine = null;
+// tanda tangan transaksi (rekening + tanggal + keterangan + nominal + dana) untuk menolak transaksi yang sudah di-approve saat impor ulang
+const txSig = t => hashStr([t.rekening || '', t.tanggalISO || '', String(t.ketAsli || t.keterangan || '').toLowerCase().replace(/\s+/g, ' ').trim(), Math.round((Number(t.jumlah) || 0) * 100), t.dana || ''].join('|'));
 function saveLines(t, lines) {
   const cl = lines.map(l => ({ final: l.final || '', amt: (l.amt === '' || l.amt == null || isNaN(l.amt)) ? '' : Number(l.amt) }));
   return patchTx(t.id, { codes: cl, final: cl[0].final });
@@ -1327,8 +1332,9 @@ function renderProcHist(nProc) {
   const vis = procHistAll ? list : [];                 // default tersembunyi; klik judul untuk menampilkan semua riwayat
   box.innerHTML = '<button type="button" class="ph-h ' + (procHistAll ? 'open' : '') + '" data-ph-all aria-expanded="' + procHistAll + '">🕘 Riwayat unduh jurnal <span class="ph-n">(' + list.length + ')</span><span class="ph-c">▾</span></button>' +
     (!procHistAll ? '' : vis.map(x => '<div class="hi"><span class="badge">' + (x.tpl === 'PMH' ? 'PMH · Excel' : 'KGI · CSV') + '</span> <b>' + esc(x.first || x.fileName) + (x.count > 1 ? ' s.d. ' + esc(x.lastNo) : '') + '</b>' +
-      '<div class="m">' + fmtDate(x._t) + ' · ' + (x.nTx || 0) + ' transaksi · ' + (x.count || 0) + ' jurnal · ' + (x.rows || 0) + ' baris</div>' +
+      '<div class="m">' + fmtDate(x._t) + ' · ' + (x.nTx || 0) + ' transaksi · ' + (x.count || 0) + ' jurnal · ' + (x.rows || 0) + ' baris' + (x.approved ? ' · <span class="apd">✓ Approved' + (x.approvedAt && x.approvedAt.toMillis ? ' ' + fmtDate(x.approvedAt.toMillis()) : '') + '</span>' : '') + '</div>' +
       '<div class="r"><span>' + esc(x.fileName || '') + '</span><span>' +
+      '<button class="btn appr' + (x.approved ? ' on' : '') + '" type="button" data-papp="' + esc(x.id) + '" title="' + (x.approved ? 'Sudah diimpor di software template (klik untuk membatalkan approve)' : 'Tandai sudah diimpor di software template') + '">' + (x.approved ? '✓ Approved' : 'Approve') + '</button> ' +
       ((x.csv || x.data) ? '<button class="btn" type="button" data-pdl="' + esc(x.id) + '">⬇ Unduh</button> ' : '<small>(terlalu besar untuk disimpan)</small> ') +
       '<button class="btn danger" type="button" data-pundo="' + esc(x.id) + '">Batalkan</button></span></div></div>').join('') ||
       '<div class="m" style="margin-top:6px">Belum ada riwayat unduhan di folder ini.</div>') +
@@ -1608,7 +1614,7 @@ $('#csvList').addEventListener('dblclick', e => {
     const v = ta.value.replace(/\s+/g, ' ').trim();
     if (save && v !== (t.keterangan || '')) {
       if (!v) { toast('Keterangan tidak boleh kosong'); }
-      else { await patchTx(t.id, { keterangan: v }); toast('Keterangan diperbarui'); }
+      else { await patchTx(t.id, { keterangan: v, ketAsli: t.ketAsli || t.keterangan || '' }); toast('Keterangan diperbarui'); }
     }
     csvPending = false; renderCsv();
   };
@@ -1636,7 +1642,9 @@ $('#csvFile').addEventListener('change', async e => {
   const fk = txFolderKey(), tpl = csvTpl;
   const seen = new Set(mutasi.keys());
   const stamp = Date.now().toString(36);
-  let fi = 0, added = 0, dup = 0, skipped = 0, bad = [], unknown = new Set();
+  let fi = 0, added = 0, dup = 0, rejected = 0, skipped = 0, bad = [], unknown = new Set();
+  const apprSigs = new Map();     // transaksi dari unduhan yang sudah di-approve: ditolak otomatis bila muncul lagi di CSV
+  [...exps.values()].filter(x => x.approved && Array.isArray(x.sigs) && (x.folderId || '__none') === currentFolder).forEach(x => x.sigs.forEach(h => apprSigs.set(h, (apprSigs.get(h) || 0) + 1)));
   toast('Memproses ' + files.length + ' file…', 1500);
   for (const f of files) {
     try {
@@ -1647,7 +1655,13 @@ $('#csvFile').addEventListener('change', async e => {
       else if (!REK_MAP[res.rekening]) unknown.add(res.rekening || '(tidak terbaca)');
       const iid = 'c' + stamp + (fi++).toString(36);
       const fresh = [];
-      res.rows.forEach(r => { const id = fk + '__' + r.hash; if (seen.has(id)) dup++; else { seen.add(id); fresh.push({ id, r }); } });
+      res.rows.forEach(r => {
+        const id = fk + '__' + r.hash, sg = txSig(r), left = apprSigs.get(sg) || 0;
+        if (left > 0) apprSigs.set(sg, left - 1);
+        if (seen.has(id)) dup++;
+        else if (left > 0) rejected++;
+        else { seen.add(id); fresh.push({ id, r }); }
+      });
       for (let i = 0; i < fresh.length; i += 400) {
         const b = writeBatch(db);
         fresh.slice(i, i + 400).forEach(({ id, r }) => b.set(doc(db, 'users', uid, 'mutasi', id), { ...r, folderId: currentFolder === '__none' ? null : currentFolder, fileName: f.name, importId: iid, importedAt: serverTimestamp() }));
@@ -1656,7 +1670,7 @@ $('#csvFile').addEventListener('change', async e => {
       added += fresh.length;
     } catch (err) { console.error(err); bad.push(f.name); }
   }
-  let msg = (files.length > 1 ? files.length + ' file: ' : '') + added + ' transaksi ditambahkan' + (dup ? ', ' + dup + ' sudah ada (dilewati)' : '') + (skipped ? ', ' + skipped + ' baris tidak terbaca' : '') + '.';
+  let msg = (files.length > 1 ? files.length + ' file: ' : '') + added + ' transaksi ditambahkan' + (dup ? ', ' + dup + ' sudah ada (dilewati)' : '') + (rejected ? ', ' + rejected + ' ditolak otomatis (sudah di-approve/diimpor di template)' : '') + (skipped ? ', ' + skipped + ' baris tidak terbaca' : '') + '.';
   if (bad.length) msg += ' Gagal dibaca: ' + bad.join(', ') + '.';
   if (unknown.size) msg += ' Rekening ' + [...unknown].join(', ') + ' belum dikenal — pilih kode rekening manual.';
   toast(msg, 8000);
@@ -1776,12 +1790,20 @@ function refreshProc() {
     (r.nOther ? ' ' + r.nOther + ' transaksi rekening ' + (procTpl === 'PMH' ? 'P/U' : 'GR') + ' tidak ikut — proses dengan template ' + (procTpl === 'PMH' ? 'KGI' : 'PMH') + '.' : '');
   $('#pGo').disabled = !ok;
 }
+// nomor awal = nomor terakhir dari unduhan yang TERAKHIR DI-APPROVE (folder & template yang sama) + 1; unduhan yang belum di-approve diabaikan
+function nextProcNo() {
+  const approved = [...exps.values()].filter(x => x.approved && (x.folderId || '__none') === currentFolder && (x.tpl === 'PMH' ? 'PMH' : 'KGI') === procTpl);
+  const at = x => (x.approvedAt && x.approvedAt.toMillis ? x.approvedAt.toMillis() : x._t) || 0;
+  const numOfStr = v => { const m = /(\d+)\s*$/.exec(String(v == null ? '' : v)); return m ? parseInt(m[1], 10) : NaN; };
+  let best = null;
+  approved.forEach(x => { const n = numOfStr(x.lastNo || x.first); if (!isNaN(n) && (!best || at(x) > at(best.x) || (at(x) === at(best.x) && n > best.n))) best = { x, n }; });
+  return best ? best.n + 1 : 1;
+}
 function loadProcDefaults() {
   document.querySelectorAll('#pTpl button').forEach(b => b.classList.toggle('on', b.dataset.tpl === procTpl));
   show($('#pPrefixWrap'), procTpl !== 'PMH');
   $('#pPrefix').value = lsGet('ec.procPrefix2') || 'KGI';
-  const nx = parseInt(lsGet(procKey()), 10);
-  $('#pStart').value = nx > 0 ? nx : 1;
+  $('#pStart').value = nextProcNo();
   $('#pGo').textContent = procTpl === 'PMH' ? '⬇ Unduh Excel' : '⬇ Unduh CSV';
 }
 $('#btnProc').onclick = () => {
@@ -1843,9 +1865,31 @@ $('#procHistBox').addEventListener('click', async e => {
   if (e.target.closest('[data-ph-show]')) { showProcessed = !showProcessed; csvLimit = 100; renderCsv(); return; }
   const dl = e.target.closest('[data-pdl]');
   if (dl) { const x = exps.get(dl.dataset.pdl); if (x && (x.csv || x.data)) downloadExport(x); return; }
+  const ap = e.target.closest('[data-papp]');
+  if (ap) {
+    const x = exps.get(ap.dataset.papp); if (!x) return;
+    if (!navigator.onLine) return toast('Tidak ada koneksi internet.', 3500);
+    const label = (x.first || x.fileName) + (x.count > 1 ? ' s.d. ' + x.lastNo : '');
+    try {
+      if (x.approved) {
+        if (!confirm('Batalkan approve ' + label + '?\n\nTransaksi dari unduhan ini tidak lagi ditolak otomatis saat impor CSV berikutnya.')) return;
+        ap.disabled = true;
+        const b = writeBatch(db); b.update(doc(db, 'users', uid, 'exports', x.id), { approved: false, approvedAt: null, sigs: [] }); await b.commit();
+        toast('Approve dibatalkan'); return;
+      }
+      const txs = [...mutasi.values()].filter(t => t.procId === x.id);
+      if (!txs.length) return toast('Tidak ada transaksi yang terkait unduhan ini.', 3500);
+      if (!confirm('Approve ' + label + '?\n\nArtinya ' + txs.length + ' transaksi ini sudah diimpor di software template. Pada impor CSV berikutnya, transaksi dengan nomor rekening, tanggal, keterangan, dan nominal yang sama akan otomatis ditolak.')) return;
+      ap.disabled = true;
+      const b = writeBatch(db); b.update(doc(db, 'users', uid, 'exports', x.id), { approved: true, approvedAt: serverTimestamp(), sigs: txs.map(txSig) }); await b.commit();
+      toast('Di-approve: ' + txs.length + ' transaksi akan ditolak otomatis bila terimpor lagi', 4000);
+    } catch (err) { console.error(err); toast('Gagal approve: ' + (err.code || err.message), 5000); ap.disabled = false; }
+    return;
+  }
   const un = e.target.closest('[data-pundo]');
   if (un) {
     const x = exps.get(un.dataset.pundo); if (!x) return;
+    if (x.approved && !confirm('Riwayat ini sudah di-approve (sudah diimpor di software template).\n\nMembatalkan akan menghapus penandanya sehingga transaksi bisa terimpor lagi. Lanjutkan?')) return;
     const txs = [...mutasi.values()].filter(t => t.procId === x.id);
     if (!confirm('Batalkan proses ' + (x.first || x.fileName) + (x.count > 1 ? ' s.d. ' + x.lastNo : '') + '?\n\n' + txs.length + ' transaksi akan muncul kembali di daftar dan riwayat unduhan ini dihapus. File CSV yang sudah Anda unduh tidak terpengaruh.')) return;
     if (!navigator.onLine) return toast('Tidak ada koneksi internet.', 3500);
