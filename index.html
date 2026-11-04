@@ -188,6 +188,14 @@ details.rp-prev summary{cursor:pointer;font-weight:700;color:var(--brand)}
 .tgl small{color:var(--muted);font-weight:500;margin-left:6px}
 .amt{font-weight:800;font-variant-numeric:tabular-nums}
 .amt.cr{color:var(--in-fg)} .amt.db{color:var(--out-fg)}
+.tx .amt[data-split]{cursor:pointer;border-bottom:1px dashed currentColor;-webkit-tap-highlight-color:transparent}
+.tx .amt[data-split]:active{opacity:.6}
+.sp-row{display:flex;gap:8px;align-items:center;margin-top:8px}
+.sp-row .inp{flex:1;text-align:right;font-variant-numeric:tabular-nums}
+.sp-row .sp-n{width:22px;color:var(--muted);font-size:12px;font-weight:700;text-align:center}
+.sp-sum{margin-top:12px;padding:10px 12px;border-radius:12px;background:var(--soft);font-size:13px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.sp-sum b{font-variant-numeric:tabular-nums}
+.sp-sum.err{color:var(--danger)}
 .tx .ket{margin:5px 0 0;font-size:13.5px;word-break:break-word}
 .tx .ket{cursor:text;touch-action:manipulation}
 .tx .ket-edit{width:100%;margin:5px 0 0;font-size:13.5px;min-height:56px;resize:vertical;line-height:1.4}
@@ -244,7 +252,10 @@ select.seg.need{border-color:var(--danger);background:#fff3f1}
 #procHint{margin:-2px 0 10px}
 #procHint.ready{color:var(--in-fg);font-weight:700}
 .phbox{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 14px;margin-bottom:12px;box-shadow:var(--shadow)}
-.ph-h{font-weight:800;color:var(--brand);font-size:14px}
+.ph-h{font-weight:800;color:var(--brand);font-size:14px;display:flex;align-items:center;gap:6px;width:100%;background:none;border:0;padding:2px 0;cursor:pointer;text-align:left;font-family:inherit;-webkit-tap-highlight-color:transparent}
+.ph-h .ph-n{font-weight:600;color:var(--muted);font-size:12px}
+.ph-h .ph-c{margin-left:auto;color:var(--muted);transition:transform .2s}
+.ph-h.open .ph-c{transform:rotate(180deg)}
 .ph-f{display:flex;gap:14px;flex-wrap:wrap;margin-top:8px}
 .ph-f .link{padding:2px 0}
 #toast{position:fixed;left:50%;bottom:calc(86px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(20px);background:#2b1a10;color:#fff;padding:10px 16px;border-radius:12px;font-size:13.5px;opacity:0;pointer-events:none;transition:.25s;z-index:80;max-width:90vw;text-align:center}
@@ -441,6 +452,16 @@ select.seg.need{border-color:var(--danger);background:#fff3f1}
   <button class="btn block" type="button" data-ct="KGI" style="flex-direction:column;gap:2px"><b>Rincian Kode KGI</b><small style="font-weight:500;color:var(--muted)">Kode rekening P &amp; U · kode jenis PRK &amp; O (otomatis dari nomor rekening)</small></button>
   <button class="btn block" type="button" data-ct="PMH" style="flex-direction:column;gap:2px;margin-top:10px"><b>Rincian Kode PMH</b><small style="font-weight:500;color:var(--muted)">Kode rekening GR · kode jenis PRK</small></button>
   <div class="foot"><button id="ctCancel" class="btn" type="button">Batal</button></div>
+</div></div>
+
+<!-- ===== Modal pecah transaksi ===== -->
+<div id="ovSplit" class="ov hidden"><div class="sheet">
+  <h2>Pecah Transaksi</h2>
+  <p class="sub" id="spInfo"></p>
+  <div id="spRows"></div>
+  <button id="spAdd" class="link" type="button" style="margin-top:10px">＋ Tambah pecahan lain</button>
+  <div id="spSum" class="sp-sum"></div>
+  <div class="foot"><button id="spCancel" class="btn" type="button">Batal</button><button id="spOk" class="btn primary" type="button">Pecah Transaksi</button></div>
 </div></div>
 
 <div id="ovCsvHist" class="ov hidden"><div class="sheet">
@@ -1303,16 +1324,15 @@ function renderProcHist(nProc) {
   const box = $('#procHistBox');
   const list = [...exps.values()].filter(x => (x.folderId || '__none') === currentFolder).sort((a, b) => b._t - a._t);
   show(box, list.length > 0 || nProc > 0);
-  const vis = procHistAll ? list : list.slice(0, 5);
-  box.innerHTML = '<div class="ph-h">🕘 Riwayat unduh jurnal</div>' +
-    (vis.map(x => '<div class="hi"><span class="badge">' + (x.tpl === 'PMH' ? 'PMH · Excel' : 'KGI · CSV') + '</span> <b>' + esc(x.first || x.fileName) + (x.count > 1 ? ' s.d. ' + esc(x.lastNo) : '') + '</b>' +
+  const vis = procHistAll ? list : [];                 // default tersembunyi; klik judul untuk menampilkan semua riwayat
+  box.innerHTML = '<button type="button" class="ph-h ' + (procHistAll ? 'open' : '') + '" data-ph-all aria-expanded="' + procHistAll + '">🕘 Riwayat unduh jurnal <span class="ph-n">(' + list.length + ')</span><span class="ph-c">▾</span></button>' +
+    (!procHistAll ? '' : vis.map(x => '<div class="hi"><span class="badge">' + (x.tpl === 'PMH' ? 'PMH · Excel' : 'KGI · CSV') + '</span> <b>' + esc(x.first || x.fileName) + (x.count > 1 ? ' s.d. ' + esc(x.lastNo) : '') + '</b>' +
       '<div class="m">' + fmtDate(x._t) + ' · ' + (x.nTx || 0) + ' transaksi · ' + (x.count || 0) + ' jurnal · ' + (x.rows || 0) + ' baris</div>' +
       '<div class="r"><span>' + esc(x.fileName || '') + '</span><span>' +
       ((x.csv || x.data) ? '<button class="btn" type="button" data-pdl="' + esc(x.id) + '">⬇ Unduh</button> ' : '<small>(terlalu besar untuk disimpan)</small> ') +
       '<button class="btn danger" type="button" data-pundo="' + esc(x.id) + '">Batalkan</button></span></div></div>').join('') ||
       '<div class="m" style="margin-top:6px">Belum ada riwayat unduhan di folder ini.</div>') +
-    '<div class="ph-f">' + (list.length > 5 ? '<button class="link" type="button" data-ph-all>' + (procHistAll ? 'Tampilkan lebih sedikit' : 'Lihat semua (' + list.length + ')') + '</button>' : '') +
-    (nProc ? '<button class="link" type="button" data-ph-show>' + (showProcessed ? 'Sembunyikan' : 'Tampilkan') + ' ' + nProc + ' transaksi yang sudah diproses</button>' : '') + '</div>';
+    '<div class="ph-f">' + (nProc ? '<button class="link" type="button" data-ph-show>' + (showProcessed ? 'Sembunyikan' : 'Tampilkan') + ' ' + nProc + ' transaksi yang sudah diproses</button>' : '') + '</div>';
 }
 function renderCsv() {
   const list = $('#csvList');
@@ -1361,7 +1381,7 @@ function renderCsv() {
     const sisa = multi && anyAmt ? (Math.abs(diff) < 0.005 ? '<span class="sisa ok">✓ nominal pas</span>' : '<span class="sisa">Sisa ' + fmtRp.format(diff) + '</span>') : '';
     return '<article class="tx" data-id="' + esc(t.id) + '">' +
       '<div class="tx1"><span class="tgl">' + esc(t.tanggal) + '<small>…' + esc(String(t.rekening || '').slice(-4)) + '</small></span>' +
-      '<span class="amt ' + cls + '">' + (t.dana === 'CR' ? '+ ' : '− ') + fmtRp.format(t.jumlah) + '</span></div>' +
+      '<span class="amt ' + cls + '" data-split title="Klik untuk memecah transaksi">' + (t.dana === 'CR' ? '+ ' : '− ') + fmtRp.format(t.jumlah) + '</span></div>' +
       '<p class="ket" data-ket title="Klik 2x untuk edit keterangan">' + esc(t.keterangan) + '</p>' + lineHtml +
       '<div class="tfoot"><button type="button" class="link" data-add-line>＋ Tambah kode lain</button>' + sisa + '<span class="sp"></span><button type="button" class="link" style="color:var(--danger)" data-del-tx>Hapus transaksi</button></div>' +
       '</article>';
@@ -1486,6 +1506,91 @@ $('#csvList').addEventListener('click', async e => {
     catch (err) { toast('Gagal menghapus: ' + (err.code || err.message), 4000); }
   }
 });
+/* --- pecah transaksi: klik nominal -> pop up pecahan --- */
+let splitId = null, splitVals = [''];
+const cents = n => Math.round((Number(n) || 0) * 100);
+function splitCalc() {
+  const t = mutasi.get(splitId); if (!t) return null;
+  const parts = splitVals.map(v => parseIdAmt(v));
+  const filled = parts.filter(v => v !== '');
+  const total = filled.reduce((a, v) => a + cents(v), 0);
+  const rest = cents(t.jumlah) - total;
+  const bad = parts.some((v, i) => splitVals[i].trim() !== '' && (v === '' || v <= 0));
+  return { t, parts, filled, total, rest, bad, ok: filled.length > 0 && !bad && rest > 0 };
+}
+function splitSummary() {
+  const c = splitCalc(); if (!c) return;
+  const box = $('#spSum');
+  let msg, err = false;
+  if (c.bad) { msg = 'Nominal pecahan harus berupa angka lebih dari 0.'; err = true; }
+  else if (!c.filled.length) msg = 'Isi nominal pecahan untuk melihat sisa transaksi asal.';
+  else if (c.rest <= 0) { msg = 'Total pecahan (' + fmtRp.format(c.total / 100) + ') harus lebih kecil dari nominal transaksi.'; err = true; }
+  else msg = '';
+  box.className = 'sp-sum' + (err ? ' err' : '');
+  box.innerHTML = msg ? '<span>' + esc(msg) + '</span>' : '<span>Transaksi asal menjadi</span><b>' + fmtRp.format(c.rest / 100) + '</b>';
+  $('#spOk').disabled = !c.ok;
+}
+function splitRender(focusLast) {
+  $('#spRows').innerHTML = splitVals.map((v, i) =>
+    '<div class="sp-row" data-i="' + i + '"><span class="sp-n">' + (i + 1) + '</span><input class="inp" inputmode="decimal" autocomplete="off" placeholder="Nominal pecahan, mis. 7.000.000" value="' + esc(v) + '">' +
+    (splitVals.length > 1 ? '<button type="button" class="rm" data-sp-rm title="Hapus pecahan ini">✕</button>' : '') + '</div>').join('');
+  splitSummary();
+  if (focusLast) { const ins = $('#spRows').querySelectorAll('input'); if (ins.length) ins[ins.length - 1].focus(); }
+}
+function openSplit(t) {
+  splitId = t.id; splitVals = [''];
+  $('#spInfo').innerHTML = esc(t.tanggal) + ' · ' + (t.dana === 'CR' ? '+ ' : '− ') + '<b>' + fmtRp.format(t.jumlah) + '</b><br>' + esc(String(t.keterangan || '').slice(0, 120));
+  splitRender(false); show($('#ovSplit'), true);
+  setTimeout(() => { const i = $('#spRows input'); if (i) i.focus(); }, 80);
+}
+const closeSplit = () => { show($('#ovSplit'), false); splitId = null; };
+$('#csvList').addEventListener('click', e => {
+  const a = e.target.closest('.amt[data-split]'); if (!a) return;
+  const t = mutasi.get(a.closest('.tx').dataset.id); if (!t) return;
+  if (t.procId) return toast('Transaksi sudah diproses, batalkan unduhan jurnalnya dulu untuk memecah.', 3500);
+  if (!(t.jumlah > 0.01)) return;
+  openSplit(t);
+});
+$('#spRows').addEventListener('input', e => {
+  const r = e.target.closest('.sp-row'); if (!r) return;
+  splitVals[+r.dataset.i] = e.target.value; splitSummary();
+});
+$('#spRows').addEventListener('focusout', e => {
+  const r = e.target.closest('.sp-row'); if (!r || !e.target.matches('input')) return;
+  const n = parseIdAmt(e.target.value);
+  if (n !== '' && n > 0) { e.target.value = fmtRp.format(n); splitVals[+r.dataset.i] = e.target.value; splitSummary(); }
+});
+$('#spRows').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); if (!$('#spOk').disabled) $('#spOk').click(); } });
+$('#spRows').addEventListener('click', e => {
+  const rm = e.target.closest('[data-sp-rm]'); if (!rm) return;
+  splitVals.splice(+rm.closest('.sp-row').dataset.i, 1); if (!splitVals.length) splitVals = [''];
+  splitRender(false);
+});
+$('#spAdd').onclick = () => { splitVals.push(''); splitRender(true); };
+$('#spCancel').onclick = closeSplit;
+$('#ovSplit').addEventListener('click', e => { if (e.target.id === 'ovSplit') closeSplit(); });
+$('#spOk').onclick = async () => {
+  const c = splitCalc(); if (!c || !c.ok) return;
+  if (!navigator.onLine) return toast('Tidak ada koneksi internet.', 3500);
+  const t = c.t, sfx = (/([A-Za-z]{1,2})\s*$/.exec(String(t.jumlahRaw || '')) || [])[1] || '';
+  const raw = n => fmtRp.format(n) + (sfx ? ' ' + sfx : '');
+  const stamp = Date.now().toString(36);
+  $('#spOk').disabled = true;
+  try {
+    const b = writeBatch(db);
+    b.update(doc(db, 'users', uid, 'mutasi', t.id), { jumlah: c.rest / 100, jumlahRaw: raw(c.rest / 100) });
+    c.filled.forEach((v, k) => {
+      const child = { ...t }; delete child.id; delete child.codes;
+      const sid = t.id + '__s' + stamp + k.toString(36);
+      Object.assign(child, { jumlah: cents(v) / 100, jumlahRaw: raw(cents(v) / 100), final: '', procId: null,
+        hash: String(t.hash || '') + '#s' + stamp + k.toString(36), seq: (Number(t.seq) || 0) + 0.001 * (k + 1), splitFrom: t.id });
+      b.set(doc(db, 'users', uid, 'mutasi', sid), child);
+    });
+    await b.commit();
+    toast('Transaksi dipecah menjadi ' + (c.filled.length + 1) + ' bagian', 2500);
+    closeSplit();
+  } catch (err) { toast('Gagal memecah: ' + (err.code || err.message), 4000); $('#spOk').disabled = false; }
+};
 /* --- klik 2x pada keterangan transaksi = edit teks --- */
 $('#csvList').addEventListener('dblclick', e => {
   const p = e.target.closest('p[data-ket]'); if (!p) return;
