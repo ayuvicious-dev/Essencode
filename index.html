@@ -157,6 +157,23 @@ textarea.inp{resize:vertical;min-height:70px}
 .rp-t tr.k td:nth-child(2){padding-left:20px;color:var(--muted)}
 .rp-img{display:block;width:100%;max-width:560px;margin:0 auto;border:1px solid var(--line);border-radius:10px;background:#fff}
 details.rp-prev summary{cursor:pointer;font-weight:700;color:var(--brand)}
+.co-card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:12px;box-shadow:var(--shadow)}
+.co-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.co-head h3{margin:0 0 4px;font-size:16px;color:var(--brand)}
+.co-tgt{margin-top:8px;font-size:13px;color:var(--muted)} .co-tgt b{color:var(--ink);font-variant-numeric:tabular-nums}
+.badge.b-sub{background:#efe3f7;color:#6b3a8c} .badge.b-ss{background:#e1f0f2;color:#1d6b73}
+.co-acts{display:flex;gap:4px;flex-wrap:wrap}
+.co-acts button{border:0;background:transparent;color:var(--muted);font-size:12.5px;font-weight:600;padding:6px 9px;border-radius:9px}
+.co-acts button:hover{background:var(--soft)} .co-acts .del{color:var(--danger)}
+.co-lr{margin-top:10px}
+.co-lr h4{margin:0 0 4px;font-size:13px;color:var(--brand2)}
+.co-card .co-head{cursor:pointer}
+.co-card.co-col .badge,.co-card.co-col .co-tgt,.co-card.co-col .co-acts,.co-card.co-col .co-lr{display:none}
+.co-pi{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:12px;padding:8px 10px;margin-top:7px}
+.co-pi .tx{flex:1;min-width:0}
+.co-pi b{display:block;font-size:14px}
+.co-pi small{color:var(--muted);font-size:12px;display:block}
+.co-pi button{border:0;background:transparent;color:var(--danger);font-size:12.5px;font-weight:600;padding:6px 8px;border-radius:9px}
 .fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
 .fc{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;box-shadow:var(--shadow);cursor:pointer}
 .fc:active{transform:scale(.99)}
@@ -324,8 +341,15 @@ select.seg.need{border-color:var(--danger);background:#fff3f1}
 
   <main>
     <section id="home">
-      <div class="home-head"><h2>Folder Kode</h2><div class="hh-btns"><button id="btnDaily" class="btn" type="button">📊 Daily Report</button><button id="btnAddFolder" class="btn primary" type="button">＋ Tambah Folder</button></div></div>
+      <div class="home-head"><h2>Folder Kode</h2><div class="hh-btns"><button id="btnProgress" class="btn" type="button">📈 Progress</button><button id="btnDaily" class="btn" type="button">📊 Daily Report</button><button id="btnAddFolder" class="btn primary" type="button">＋ Tambah Folder</button></div></div>
       <div id="folders"></div>
+    </section>
+    <section id="progressView" class="hidden">
+      <div class="rp-bar"><h2>Progress</h2><div class="hh-btns"><select id="coYear" class="inp" style="width:auto;padding:9px 12px" aria-label="Tahun laporan"></select><button id="btnCoDl" class="btn" type="button">⬇ Download Output</button><button id="btnAddCo" class="btn primary" type="button">＋ Tambah Perusahaan</button></div></div>
+      <input id="fileCoLr" type="file" accept=".xlsx,.xls" class="hidden" multiple>
+      <input id="fileCoBb" type="file" accept=".xlsx,.xls" class="hidden">
+      <div id="coList"></div>
+      <div id="coPrev"></div>
     </section>
     <section id="reportView" class="hidden">
       <div class="rp-bar"><h2>Daily Report</h2><button id="btnRpDl" class="btn primary" type="button">⬇ Download Output</button></div>
@@ -415,6 +439,20 @@ select.seg.need{border-color:var(--danger);background:#fff3f1}
   <p class="note" id="impNote"></p>
   <div class="bar hidden" id="barWrap"><i id="bar"></i></div>
   <div class="foot"><button id="impCancel" class="btn" type="button">Batal</button><button id="impGo" class="btn primary" type="button">Terapkan Impor</button></div>
+</div></div>
+
+<!-- ===== Modal perusahaan (Progress) ===== -->
+<div id="ovCo" class="ov hidden"><div class="sheet">
+  <h2 id="coTitle">Tambah Perusahaan</h2>
+  <p class="sub">Data perusahaan untuk pemantauan progress terhadap target omset tahunan.</p>
+  <label class="f" for="coName">Nama perusahaan *</label>
+  <input id="coName" class="inp" maxlength="80" autocomplete="off" placeholder="mis. PT Contoh Sejahtera">
+  <label class="f" for="coType">Jenis perusahaan</label>
+  <select id="coType" class="inp"><option value="Subsidiary">Subsidiary</option><option value="Sub-Subsidiary">Sub-Subsidiary</option></select>
+  <label class="f" for="coTarget">Target omset tahunan (Rp) *</label>
+  <input id="coTarget" class="inp" inputmode="decimal" autocomplete="off" placeholder="mis. 12.000.000.000">
+  <div id="coMsg" class="msg"></div>
+  <div class="foot"><button id="coCancel" class="btn" type="button">Batal</button><button id="coSave" class="btn primary" type="button">Simpan</button></div>
 </div></div>
 
 <!-- ===== Modal folder ===== -->
@@ -650,11 +688,12 @@ let exps = new Map(), showProcessed = false, procHistAll = false, procBusy = fal
 let mutasi = new Map(), mutasiLoaded = false, folderTab = 'csv';   // transaksi hasil impor CSV   // null = beranda, '__none' = kode lama tanpa folder
 let filterDana = '', filterRek = '', sortBy = 'kode', query = '', limit = 100;
 let reportView = false, reports = new Map(), repSel = { neraca: '', labarugi: '' };   // Daily Report
+let progView = false, companies = new Map(), coLr = new Map();   // Progress
 
 onAuthStateChanged(auth, user => {
   const sp = $('#splash'); if (sp) sp.remove();
   if (unsub) { unsub(); unsub = null; }
-  data = new Map(); imports = new Map(); folders = new Map(); mutasi = new Map(); exps = new Map(); showProcessed = false; loaded = false; foldersLoaded = false; mutasiLoaded = false; currentFolder = null; folderTab = 'csv'; reportView = false; reports = new Map(); repSel = { neraca: '', labarugi: '' };
+  data = new Map(); imports = new Map(); folders = new Map(); mutasi = new Map(); exps = new Map(); showProcessed = false; loaded = false; foldersLoaded = false; mutasiLoaded = false; currentFolder = null; folderTab = 'csv'; reportView = false; reports = new Map(); repSel = { neraca: '', labarugi: '' }; progView = false; companies = new Map(); coLr = new Map();
   if (user) {
     uid = user.uid;
     $('#who').textContent = user.email || '';
@@ -695,7 +734,17 @@ onAuthStateChanged(auth, user => {
       snap.forEach(d => m.set(d.id, { id: d.id, ...d.data() }));
       reports = m; if (reportView) renderReport();
     }, err => console.error(err));
-    unsub = () => { u1(); u2(); u3(); u4(); u5(); u6(); };
+    const u7 = onSnapshot(collection(db, 'users', uid, 'companies'), snap => {
+      const m = new Map();
+      snap.forEach(d => m.set(d.id, { id: d.id, ...d.data() }));
+      companies = m; if (progView) renderProgress();
+    }, err => console.error(err));
+    const u8 = onSnapshot(collection(db, 'users', uid, 'companyLr'), snap => {
+      const m = new Map();
+      snap.forEach(d => m.set(d.id, { id: d.id, ...d.data() }));
+      coLr = m; if (progView) renderProgress();
+    }, err => console.error(err));
+    unsub = () => { u1(); u2(); u3(); u4(); u5(); u6(); u7(); u8(); };
   } else {
     uid = null;
     show($('#app'), false); show($('#auth'), true);
@@ -719,19 +768,20 @@ const docIdFor = key => currentFolder === '__none' ? key : currentFolder + '__' 
 const folderName = id => id === '__none' ? 'Tanpa folder' : ((folders.get(id) || {}).name || 'Folder');
 
 function applyView() {
-  const inF = currentFolder !== null, rep = reportView && !inF, home = !inF && !rep;
+  const inF = currentFolder !== null, prog = progView && !inF, rep = reportView && !inF && !prog, home = !inF && !rep && !prog;
   const kode = inF && (folderTab === 'kgi' || folderTab === 'pmh');
-  show($('#home'), home); show($('#reportView'), rep); show($('#folderView'), inF); show($('#ftabs'), inF);
+  show($('#home'), home); show($('#progressView'), prog); show($('#reportView'), rep); show($('#folderView'), inF); show($('#ftabs'), inF);
   show($('#csvView'), inF && folderTab === 'csv'); show($('#kodeView'), kode);
   show($('#topSub'), kode); show($('#btnAdd'), kode); show($('#btnBack'), !home);
   document.querySelectorAll('#ftabs button').forEach(b => b.classList.toggle('on', b.dataset.t === folderTab));
-  $('#title').textContent = home ? 'Essencode' : rep ? 'Daily Report' : folderName(currentFolder);
-  document.title = home ? 'Essencode — Rekap Kode Transaksi' : (rep ? 'Daily Report' : folderName(currentFolder)) + ' · Essencode';
+  $('#title').textContent = home ? 'Essencode' : prog ? 'Progress' : rep ? 'Daily Report' : folderName(currentFolder);
+  document.title = home ? 'Essencode — Rekap Kode Transaksi' : (prog ? 'Progress' : rep ? 'Daily Report' : folderName(currentFolder)) + ' · Essencode';
 }
 function renderAll() {
   if (currentFolder && currentFolder !== '__none' && foldersLoaded && !folders.has(currentFolder)) currentFolder = null;
   applyView();
-  if (reportView && currentFolder === null) renderReport();
+  if (progView && currentFolder === null) renderProgress();
+  else if (reportView && currentFolder === null) renderReport();
   else if (currentFolder === null) renderHome();
   else if (folderTab === 'csv') { if (csvEditing()) csvPending = true; else renderCsv(); }
   else render();
@@ -756,8 +806,8 @@ function openFolder(id) {
   history.pushState({ f: id }, ''); renderAll(); window.scrollTo(0, 0);
 }
 $('#ftabs').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; folderTab = b.dataset.t; filterDana = ''; filterRek = ''; limit = 100; renderAll(); window.scrollTo(0, 0); });
-$('#btnBack').onclick = () => { if (history.state && (history.state.f || history.state.r)) history.back(); else { currentFolder = null; reportView = false; renderAll(); } };
-window.addEventListener('popstate', e => { currentFolder = (e.state && e.state.f) || null; reportView = !!(e.state && e.state.r); folderTab = 'csv'; query = ''; $('#q').value = ''; filterDana = ''; filterRek = ''; renderAll(); });
+$('#btnBack').onclick = () => { if (history.state && (history.state.f || history.state.r || history.state.p)) history.back(); else { currentFolder = null; reportView = false; progView = false; renderAll(); } };
+window.addEventListener('popstate', e => { currentFolder = (e.state && e.state.f) || null; reportView = !!(e.state && e.state.r); progView = !!(e.state && e.state.p); folderTab = 'csv'; query = ''; $('#q').value = ''; filterDana = ''; filterRek = ''; renderAll(); });
 
 $('#folders').addEventListener('click', e => {
   if (e.target.closest('#emptyFolder')) return openFolderForm(null);
@@ -1976,6 +2026,266 @@ $('#btnExport').onclick = () => {
   toast('File Excel diunduh');
 };
 
+/* ================= Progress: perusahaan, target omset & impor Laba Rugi ================= */
+$('#btnProgress').onclick = () => { progView = true; history.pushState({ p: 1 }, ''); renderAll(); window.scrollTo(0, 0); };
+const coTs = c => c.createdAt && c.createdAt.toMillis ? c.createdAt.toMillis() : 0;
+const coCmp = (a, b) => ((a.order != null ? 0 : 1) - (b.order != null ? 0 : 1)) || ((a.order || 0) - (b.order || 0)) || coTs(a) - coTs(b) || String(a.name).localeCompare(String(b.name), 'id', { numeric: true });
+const coIsSS = c => c.type === 'Sub-Subsidiary';
+const coList = () => [...companies.values()].sort((a, b) => (coIsSS(a) - coIsSS(b)) || coCmp(a, b));
+const coLrOf = id => [...coLr.values()].filter(d => d.companyId === id).sort((a, b) => String(b.to).localeCompare(String(a.to)) || String(b.from).localeCompare(String(a.from)));
+const coPeriod = d => fmtDMY(d.from) + ' – ' + fmtDMY(d.to);
+let coYearSel = '';
+const bbJt = v => { v = Number(v) || 0; return Math.abs(v) >= 1e6 ? (v < 0 ? '-' : '') + 'Rp ' + Math.round(Math.abs(v) / 1e6).toLocaleString('id-ID') + 'jt' : 'Rp ' + Math.round(v).toLocaleString('id-ID'); };
+const bbOpen = new Set(), coOpen = new Set();
+const bbDetail = d => {
+  if (d.src !== 'bukuBesar' || !d.bb) return '';
+  let b; try { b = JSON.parse(d.bb); } catch { return ''; }
+  const row = (k, v) => '<div style="display:flex;justify-content:space-between;gap:12px;font-size:12px;color:var(--muted);padding:2px 0;border-top:1px dashed var(--line)"><span>' + k + '</span><b style="display:inline;font-size:12px;font-weight:600;color:var(--ink,inherit);white-space:nowrap">' + bbJt(v) + '</b></div>';
+  return '<details data-bb="' + esc(d.id) + '"' + (bbOpen.has(d.id) ? ' open' : '') + ' style="margin:4px 0"><summary style="cursor:pointer;font-size:12px;color:var(--brand);font-weight:600;padding:2px 0">' + (bbOpen.has(d.id) ? 'Sembunyikan rincian' : 'Lihat rincian') + '</summary>' + row('Kode 4 (pendapatan)', b.k4) + row('Pend. diterima dimuka', b.dimuka) + row('Beban kode 5–8', b.beban) + row('Persediaan barang & dinas', b.persediaan) + '</details>';
+};
+function renderProgress() {
+  const box = $('#coList'); if (!box) return;
+  const list = coList();
+  const yl = coYearList(); if (!yl.includes(coYearSel)) coYearSel = yl[0] || '';
+  $('#coYear').innerHTML = yl.length ? yl.map(y => '<option value="' + y + '"' + (y === coYearSel ? ' selected' : '') + '>Laporan ' + y + '</option>').join('') : '<option value="">Belum ada data</option>';
+  $('#coPrev').innerHTML = yl.length ? '<div class="rp-prev"><h3>Pratinjau Output</h3><img id="coImg" class="rp-img" style="max-width:760px" alt="Laporan Konsolidasi"></div>' : '';
+  if (yl.length) updateCoPreview();
+  if (!list.length) {
+    box.innerHTML = '<div class="empty"><img src="' + window.LOGO + '" alt=""><h3>Belum ada perusahaan</h3><p>Tambahkan perusahaan beserta target omset tahunannya,<br>lalu impor laporan Laba Rugi atau Buku Besar per periode.</p><button class="btn primary" id="emptyCo" type="button">＋ Tambah Perusahaan</button></div>';
+    return;
+  }
+  let lastG = null;
+  box.innerHTML = list.map(c => {
+    const lrs = coLrOf(c.id), g = coIsSS(c) ? 'Sub-Subsidiary' : 'Subsidiary', hd = g !== lastG ? '<div class="co-grp" style="font-size:12px;font-weight:700;color:var(--muted);margin:14px 4px 6px;letter-spacing:.3px">' + g + '</div>' : '';
+    lastG = g;
+    return hd + '<div class="co-card' + (coOpen.has(c.id) ? '' : ' co-col') + '" data-co="' + esc(c.id) + '"><div class="co-head"><div><div style="display:flex;align-items:center;gap:8px"><span data-co-drag title="Geser untuk ubah urutan" aria-label="Geser untuk ubah urutan" style="cursor:grab;touch-action:none;user-select:none;color:var(--muted);font-size:16px;line-height:1;padding:4px 2px;letter-spacing:-2px">⋮⋮</span><button type="button" data-co-tog aria-label="Tampilkan/sembunyikan detail" aria-expanded="' + coOpen.has(c.id) + '" style="border:0;background:transparent;color:var(--brand);font-size:15px;padding:4px 2px;cursor:pointer;line-height:1">' + (coOpen.has(c.id) ? '▾' : '▸') + '</button><h3 data-co-name title="Klik 2x untuk ubah nama" style="touch-action:manipulation;cursor:text;margin:0">' + esc(c.name) + '</h3></div>' +
+      '<span class="badge ' + (c.type === 'Sub-Subsidiary' ? 'b-ss' : 'b-sub') + '">' + esc(c.type) + '</span>' +
+      '<div class="co-tgt">Target omset tahunan: <b>Rp ' + fmtRp.format(Number(c.target) || 0) + '</b></div></div>' +
+      '<div class="co-acts"><button type="button" class="btn" data-co-imp style="padding:7px 12px;color:var(--brand)">⬆ Impor Laba Rugi</button><button type="button" class="btn" data-co-impbb style="padding:7px 12px;color:var(--brand)">⬆ Impor Buku Besar</button><button type="button" data-co-edit>Ubah</button><button type="button" class="del" data-co-del>Hapus</button></div></div>' +
+      '<div class="co-lr"><h4>Laba Rugi / Buku Besar terimpor (' + lrs.length + ')</h4>' +
+      (lrs.length ? lrs.map(d => '<div class="co-pi"><div class="tx"><b>' + esc(coPeriod(d)) + (d.src === 'bukuBesar' ? ' <span class="badge">Buku Besar</span>' : '') + '</b><small>' + (d.src === 'bukuBesar' ? 'Omset (kode 4 + pend. diterima dimuka)' : 'Omset (kode 4)') + ' Rp ' + fmtRp.format(lrM(d).omset) + ' · ' + (d.src === 'bukuBesar' ? 'Net Profit' : 'Laba (Rugi)') + ' Rp ' + fmtRp.format(lrM(d).net) + '</small>' + bbDetail(d) + '<small>' + esc(d.fileName || '') + '</small></div><button type="button" data-co-lrdel="' + esc(d.id) + '">Hapus</button></div>').join('')
+        : '<p class="sub" style="margin:6px 0 0;color:var(--muted);font-size:12.5px">Belum ada Laba Rugi / Buku Besar yang diimpor.</p>') + '</div></div>';
+  }).join('');
+}
+let coEditId = null, coImpId = null;
+// data impor lama pada tahun yang sama (periode berbeda atau sama) akan digantikan; tahun lain dibiarkan
+const coSameYear = (cid, res) => { const y = String(res.to).slice(0, 4), id = cid + '__' + res.from + '_' + res.to; return String(res.from).slice(0, 4) === y ? coLrOf(cid).filter(d => d.id !== id && String(d.to).slice(0, 4) === y && String(d.from).slice(0, 4) === y) : []; };
+function openCoForm(c) {
+  coEditId = c ? c.id : null;
+  $('#coTitle').textContent = c ? 'Ubah Perusahaan' : 'Tambah Perusahaan';
+  $('#coName').value = c ? c.name : ''; $('#coType').value = c ? c.type : 'Subsidiary';
+  $('#coTarget').value = c && c.target != null ? fmtRp.format(c.target) : ''; $('#coMsg').textContent = '';
+  show($('#ovCo'), true); setTimeout(() => $('#coName').focus(), 50);
+}
+$('#btnAddCo').onclick = () => openCoForm(null);
+$('#coYear').addEventListener('change', e => { coYearSel = e.target.value; updateCoPreview(); });
+$('#btnCoDl').onclick = async () => {
+  const Y = +$('#coYear').value; if (!Y) return toast('Impor Laba Rugi / Buku Besar perusahaan terlebih dulu.');
+  try {
+    const c = await renderConsol(Y, 4); if (!c) return toast('Belum ada data untuk dibuat laporan.');
+    c.toBlob(b => {
+      const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'LaporanKonsolidasi-' + Y + '.png';
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      toast('Laporan Konsolidasi diunduh (PNG HD)');
+    }, 'image/png');
+  } catch (err) { console.error(err); toast('Gagal membuat gambar: ' + err.message, 4000); }
+};
+$('#coCancel').onclick = () => show($('#ovCo'), false);
+$('#ovCo').addEventListener('mousedown', e => { if (e.target.id === 'ovCo') show($('#ovCo'), false); });
+$('#coTarget').addEventListener('focusout', e => { const n = parseIdAmt(e.target.value); if (n !== '' && n >= 0) e.target.value = fmtRp.format(n); });
+$('#coSave').onclick = async () => {
+  const name = norm($('#coName').value), type = $('#coType').value, target = parseIdAmt($('#coTarget').value), msg = $('#coMsg');
+  if (!name) { msg.textContent = 'Nama perusahaan wajib diisi.'; return; }
+  if (target === '' || !(target >= 0)) { msg.textContent = 'Target omset tahunan harus berupa angka 0 atau lebih.'; return; }
+  if ([...companies.values()].some(c => c.id !== coEditId && String(c.name).toLowerCase() === name.toLowerCase())) { msg.textContent = 'Nama perusahaan sudah ada.'; return; }
+  if (!navigator.onLine) { msg.textContent = 'Tidak ada koneksi internet.'; return; }
+  $('#coSave').disabled = true;
+  try {
+    const b = writeBatch(db);
+    if (coEditId) b.update(doc(db, 'users', uid, 'companies', coEditId), { name, type, target });
+    else b.set(doc(collection(db, 'users', uid, 'companies')), { name, type, target, createdAt: serverTimestamp() });
+    await b.commit(); show($('#ovCo'), false); toast(coEditId ? 'Perusahaan diperbarui' : 'Perusahaan ditambahkan');
+  } catch (err) { console.error(err); msg.textContent = 'Gagal menyimpan: ' + (err.code || err.message); }
+  $('#coSave').disabled = false;
+};
+$('#progressView').addEventListener('click', async e => {
+  if (e.target.closest('#emptyCo')) return openCoForm(null);
+  const card = e.target.closest('.co-card'); if (!card) return;
+  const c = companies.get(card.dataset.co); if (!c) return;
+  if (e.target.closest('[data-co-tog]') || (e.target.closest('.co-head') && !e.target.closest('button,input,[data-co-name],[data-co-drag]'))) { if (coOpen.has(c.id)) coOpen.delete(c.id); else coOpen.add(c.id); card.classList.toggle('co-col', !coOpen.has(c.id)); const t = card.querySelector('[data-co-tog]'); t.textContent = coOpen.has(c.id) ? '▾' : '▸'; t.setAttribute('aria-expanded', coOpen.has(c.id)); return; }
+  if (e.target.closest('[data-co-edit]')) return openCoForm(c);
+  if (e.target.closest('[data-co-impbb]')) { coImpId = c.id; $('#fileCoBb').click(); return; }
+  if (e.target.closest('[data-co-imp]')) { coImpId = c.id; $('#fileCoLr').click(); return; }
+  const ld = e.target.closest('[data-co-lrdel]');
+  if (ld) {
+    const d = coLr.get(ld.dataset.coLrdel); if (!d) return;
+    if (!confirm('Hapus ' + (d.src === 'bukuBesar' ? 'Buku Besar' : 'Laba Rugi') + ' ' + coPeriod(d) + ' milik ' + c.name + '?')) return;
+    try { const b = writeBatch(db); b.delete(doc(db, 'users', uid, 'companyLr', d.id)); await b.commit(); toast('Data periode dihapus'); }
+    catch (err) { console.error(err); toast('Gagal menghapus: ' + (err.code || err.message), 4000); }
+    return;
+  }
+  if (e.target.closest('[data-co-del]')) {
+    const lrs = coLrOf(c.id);
+    if (!confirm('Hapus perusahaan "' + c.name + '"?\n\n' + lrs.length + ' data Laba Rugi / Buku Besar terimpor ikut TERHAPUS dan tidak bisa dikembalikan.')) return;
+    if (!navigator.onLine) return toast('Tidak ada koneksi internet.', 3500);
+    try {
+      const refs = [...lrs.map(d => doc(db, 'users', uid, 'companyLr', d.id)), doc(db, 'users', uid, 'companies', c.id)];
+      for (let i = 0; i < refs.length; i += 400) { const b = writeBatch(db); refs.slice(i, i + 400).forEach(r => b.delete(r)); await b.commit(); }
+      toast('Perusahaan dihapus');
+    } catch (err) { console.error(err); toast('Gagal menghapus: ' + (err.code || err.message), 5000); }
+  }
+});
+// ---- geser urutan perusahaan (hanya di dalam kategori yang sama) ----
+let coDrag = null;
+const coGrpOf = el => { const c = companies.get(el.dataset.co); return c ? coIsSS(c) : null; };
+$('#progressView').addEventListener('pointerdown', e => {
+  const hd = e.target.closest('[data-co-drag]'); if (!hd) return;
+  const card = hd.closest('.co-card'), c = card && companies.get(card.dataset.co); if (!c) return;
+  e.preventDefault();
+  coDrag = { card, g: coIsSS(c), hd, id: e.pointerId };
+  card.style.opacity = '.65'; card.style.boxShadow = '0 8px 22px rgba(0,0,0,.18)'; hd.style.cursor = 'grabbing';
+  try { hd.setPointerCapture(e.pointerId); } catch {}
+});
+$('#progressView').addEventListener('pointermove', e => {
+  if (!coDrag) return;
+  const { card, g } = coDrag;
+  const same = [...$('#coList').querySelectorAll('.co-card')].filter(x => x !== card && coGrpOf(x) === g);
+  if (!same.length) return;
+  const next = same.find(x => { const r = x.getBoundingClientRect(); return e.clientY < r.top + r.height / 2; });
+  if (next) { if (card.nextElementSibling !== next) next.parentNode.insertBefore(card, next); }
+  else { const last = same[same.length - 1]; if (last.nextElementSibling !== card) last.after(card); }
+  const r = $('#coList').getBoundingClientRect(); if (e.clientY < 70) window.scrollBy(0, -12); else if (e.clientY > innerHeight - 70) window.scrollBy(0, 12);
+});
+async function coDragEnd(save) {
+  if (!coDrag) return; const { card, g } = coDrag; coDrag = null;
+  card.style.opacity = ''; card.style.boxShadow = '';
+  const ids = [...$('#coList').querySelectorAll('.co-card')].filter(x => coGrpOf(x) === g).map(x => x.dataset.co);
+  const before = coList().filter(c => coIsSS(c) === g).map(c => c.id);
+  if (!save || ids.join() === before.join()) return renderProgress();
+  if (!navigator.onLine) { toast('Tidak ada koneksi internet.', 3500); return renderProgress(); }
+  try { const b = writeBatch(db); ids.forEach((id, i) => b.update(doc(db, 'users', uid, 'companies', id), { order: i })); await b.commit(); toast('Urutan perusahaan disimpan'); }
+  catch (err) { console.error(err); toast('Gagal menyimpan urutan: ' + (err.code || err.message), 4000); }
+  renderProgress();
+}
+$('#progressView').addEventListener('pointerup', () => coDragEnd(true));
+$('#progressView').addEventListener('pointercancel', () => coDragEnd(false));
+$('#progressView').addEventListener('toggle', e => {
+  const t = e.target; if (!t.matches || !t.matches('details[data-bb]')) return;
+  if (t.open) bbOpen.add(t.dataset.bb); else bbOpen.delete(t.dataset.bb);
+  const sm = t.querySelector('summary'); if (sm) sm.textContent = t.open ? 'Sembunyikan rincian' : 'Lihat rincian';
+}, true);
+$('#progressView').addEventListener('dblclick', e => {
+  const h = e.target.closest('[data-co-name]'); if (!h || h.querySelector('input')) return;
+  const card = h.closest('.co-card'), c = card && companies.get(card.dataset.co); if (!c) return;
+  const inp = document.createElement('input');
+  inp.type = 'text'; inp.value = c.name; inp.maxLength = 120; inp.setAttribute('aria-label', 'Nama perusahaan');
+  inp.style.cssText = 'font:inherit;color:inherit;width:100%;min-width:140px;box-sizing:border-box;border:0;border-bottom:2px solid var(--brand);background:transparent;padding:0 0 2px;margin:0;outline:none;border-radius:0';
+  h.textContent = ''; h.appendChild(inp); inp.focus(); inp.select();
+  let done = false;
+  const finish = async save => {
+    if (done) return; done = true;
+    const name = norm(inp.value);
+    if (!save || name === c.name) return renderProgress();
+    if (!name) { toast('Nama perusahaan wajib diisi.', 3000); return renderProgress(); }
+    if ([...companies.values()].some(x => x.id !== c.id && String(x.name).toLowerCase() === name.toLowerCase())) { toast('Nama perusahaan sudah ada.', 3500); return renderProgress(); }
+    if (!navigator.onLine) { toast('Tidak ada koneksi internet.', 3500); return renderProgress(); }
+    try { const b = writeBatch(db); b.update(doc(db, 'users', uid, 'companies', c.id), { name }); await b.commit(); toast('Nama perusahaan diubah'); }
+    catch (err) { console.error(err); toast('Gagal mengubah nama: ' + (err.code || err.message), 4000); }
+    renderProgress();
+  };
+  inp.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); finish(true); } else if (ev.key === 'Escape') { ev.preventDefault(); finish(false); } });
+  inp.addEventListener('blur', () => finish(true));
+});
+$('#fileCoLr').addEventListener('change', async e => {
+  const files = [...e.target.files]; e.target.value = ''; const cid = coImpId; coImpId = null;
+  const c = companies.get(cid); if (!files.length || !c) return;
+  if (!window.XLSX) return toast('Library Excel belum termuat. Periksa koneksi internet lalu muat ulang.', 5000);
+  if (!navigator.onLine) return toast('Tidak ada koneksi internet.', 3500);
+  try {
+    const ok = [], bad = [];
+    for (const f of files) {
+      try {
+        const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' });
+        const res = parseReport(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '', raw: true }));
+        if (!res || !res.rows.length) bad.push(f.name + ' (format tidak dikenali)');
+        else if (res.type !== 'labarugi') bad.push(f.name + ' (Neraca, bukan Laba Rugi)');
+        else ok.push({ f, res });
+      } catch (err) { console.error(err); bad.push(f.name + ' (gagal dibaca)'); }
+    }
+    // satu tahun hanya menyimpan satu periode: ambil periode paling akhir; file lain di tahun yang sama dilewati
+    const best = new Map();
+    ok.forEach(x => {
+      const y = String(x.res.from).slice(0, 4) === String(x.res.to).slice(0, 4) ? String(x.res.to).slice(0, 4) : x.res.from + '_' + x.res.to;
+      const cur = best.get(y); if (!cur || x.res.to >= cur.res.to) best.set(y, x);
+    });
+    const keep = [...best.values()], skipped = ok.length - keep.length;
+    if (!keep.length) return toast('Tidak ada file yang bisa diimpor: ' + bad.join('; '), 6000);
+    const keepIds = new Set(keep.map(x => cid + '__' + x.res.from + '_' + x.res.to));
+    const delIds = new Set(); let replaced = 0;
+    keep.forEach(({ res }) => { const id = cid + '__' + res.from + '_' + res.to; if (coLr.has(id)) replaced++; coSameYear(cid, res).forEach(d => { if (!keepIds.has(d.id)) { delIds.add(d.id); replaced++; } }); });
+    const b = writeBatch(db);
+    delIds.forEach(id => b.delete(doc(db, 'users', uid, 'companyLr', id)));
+    keep.forEach(({ f, res }) => {
+      const tot = re => { const r = res.rows.find(x => x.t === 't' && re.test(x.name)); return r ? r.amt : 0; };
+      const id = cid + '__' + res.from + '_' + res.to;
+      b.set(doc(db, 'users', uid, 'companyLr', id), { companyId: cid, entity: res.entity, from: res.from, to: res.to, pendapatan: res.rows.filter(r => r.t === 'a' && /^4\d*-/.test(r.code)).reduce((a, r) => a + r.amt, 0), labaBersih: tot(/^laba \(rugi\)$/i), rows: JSON.stringify(res.rows), fileName: f.name, importedAt: serverTimestamp() });
+    });
+    await b.commit();
+    let msg = keep.length === 1 && !skipped && !bad.length
+      ? 'Laba Rugi ' + coPeriod(keep[0].res) + ' untuk ' + c.name + (replaced ? ' diperbarui (menggantikan data lama di tahun yang sama).' : ' berhasil diimpor.')
+      : keep.length + ' Laba Rugi untuk ' + c.name + ' berhasil diimpor' + (replaced ? ' (' + replaced + ' data lama di tahun yang sama digantikan)' : '') + '.';
+    if (skipped) msg += ' ' + skipped + ' file dilewati karena tahun sama dengan periode yang lebih akhir.';
+    if (bad.length) msg += ' Gagal: ' + bad.join('; ') + '.';
+    toast(msg, bad.length || skipped ? 7000 : 4000);
+  } catch (err) { console.error(err); toast('Gagal mengimpor file: ' + (err.code || err.message), 5000); }
+});
+
+// Baca Buku Besar (general ledger) -> omset & net profit periode.
+// Omset = kode 4 (kredit - debit) + akun kode 2 "Pendapatan Diterima Dimuka" (kredit - debit)
+// Net   = kode 4 - (kode 5 + 6 + 7 + 8) - akun kode 1 "Persediaan Barang" & "Persediaan Dinas"  (mutasi periode, tanpa Saldo Awal)
+function parseLedger(aoa) {
+  const cell = (r, k) => (r && r[k] != null) ? r[k] : '';
+  const entity = norm(cell(aoa[0], 0)), title = norm(cell(aoa[1], 0)).toLowerCase(), per = String(cell(aoa[2], 0));
+  const ds = [...per.matchAll(/(\d{2})\/(\d{2})\/(\d{4})/g)].map(m => m[3] + '-' + m[2] + '-' + m[1]);
+  const hi = aoa.findIndex(r => norm(cell(r, 0)).toLowerCase().startsWith('nama akun'));
+  if (!title.startsWith('buku besar') || !ds.length || hi < 0) return null;
+  const num = v => typeof v === 'number' ? v : (String(v).trim() !== '' && !isNaN(parseAmount(v)) ? parseAmount(v) : 0);
+  const accs = []; let cur = null;
+  for (let i = hi + 1; i < aoa.length; i++) {
+    const r = aoa[i], c0 = String(cell(r, 0)).replace(/\u00a0/g, ' ').trim(), c1 = norm(cell(r, 1));
+    const h = c0.match(/^\(\s*(\d)\s*-\s*([^)]*?)\s*\)\s*(.*)$/);
+    if (h && !c1 && !cell(r, 3)) { cur = { k: h[1], code: h[1] + '-' + h[2], name: norm(h[3]), d: 0, c: 0 }; accs.push(cur); continue; }
+    if (!cur || !c1 || c1.toLowerCase() === 'saldo awal') continue;
+    cur.d += num(cell(r, 4)); cur.c += num(cell(r, 5));
+  }
+  if (!accs.length) return null;
+  const sum = (f, g) => accs.filter(f).reduce((a, x) => a + g(x), 0);
+  const kr = x => x.c - x.d, db = x => x.d - x.c;
+  const k4 = sum(x => x.k === '4', kr);
+  const dimuka = sum(x => x.k === '2' && /pendapatan\s+diterima\s+dimuka/i.test(x.name), kr);
+  const beban = sum(x => '5678'.includes(x.k), db);
+  const persediaan = sum(x => x.k === '1' && /persediaan\s+(barang|dinas)/i.test(x.name), db);
+  const r2 = v => Math.round(v * 100) / 100;
+  return { entity, from: ds[0], to: ds[1] || ds[0], omset: r2(k4 + dimuka), net: r2(k4 - beban - persediaan), detail: { k4: r2(k4), dimuka: r2(dimuka), beban: r2(beban), persediaan: r2(persediaan) } };
+}
+$('#fileCoBb').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = ''; const cid = coImpId; coImpId = null;
+  const c = companies.get(cid); if (!f || !c) return;
+  if (!window.XLSX) return toast('Library Excel belum termuat. Periksa koneksi internet lalu muat ulang.', 5000);
+  if (!navigator.onLine) return toast('Tidak ada koneksi internet.', 3500);
+  try {
+    const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' });
+    const res = parseLedger(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '', raw: true }));
+    if (!res) return toast('Format file tidak dikenali. Pastikan ini file Excel Buku Besar (General Ledger).', 5000);
+    const id = cid + '__' + res.from + '_' + res.to, old = coSameYear(cid, res), existed = coLr.has(id) || old.length > 0;
+    const b = writeBatch(db);
+    old.forEach(d => b.delete(doc(db, 'users', uid, 'companyLr', d.id)));
+    b.set(doc(db, 'users', uid, 'companyLr', id), { companyId: cid, entity: res.entity, from: res.from, to: res.to, pendapatan: res.omset, labaBersih: res.net, rows: '[]', src: 'bukuBesar', bb: JSON.stringify(res.detail), fileName: f.name, importedAt: serverTimestamp() });
+    await b.commit();
+    toast('Buku Besar ' + coPeriod(res) + ' untuk ' + c.name + (existed ? ' diperbarui (menggantikan data lama di tahun yang sama).' : ' berhasil diimpor.'), 4000);
+  } catch (err) { console.error(err); toast('Gagal mengimpor file: ' + (err.code || err.message), 5000); }
+});
+
 /* ================= Daily Report: impor Neraca & Laba Rugi ================= */
 const RP_LABEL = { neraca: 'Neraca', labarugi: 'Laba Rugi' };
 const fmtDMY = iso => iso ? iso.split('-').reverse().join('/') : '';
@@ -2173,6 +2483,220 @@ $('#btnRpDl').onclick = async () => {
     }, 'image/png');
   } catch (err) { console.error(err); toast('Gagal membuat gambar: ' + err.message, 4000); }
 };
+
+/* ================= Progress: output Laporan Konsolidasi (gambar PNG) ================= */
+const lrMemo = new WeakMap();
+// Omset = jumlah akun induk berkode 4-xxxxx; Net = baris "Laba (Rugi)"
+function lrM(d) {
+  if (lrMemo.has(d)) return lrMemo.get(d);
+  const rows = rpRows(d);
+  const k4 = rows.filter(r => r.t === 'a' && /^4\d*-/.test(r.code));
+  const nr = rows.find(r => r.t === 't' && /^laba \(rugi\)$/i.test(r.name));
+  const m = { omset: k4.length ? k4.reduce((a, r) => a + (Number(r.amt) || 0), 0) : (Number(d.pendapatan) || 0), net: nr ? (Number(nr.amt) || 0) : (Number(d.labaBersih) || 0) };
+  lrMemo.set(d, m); return m;
+}
+const coOrdered = () => {
+  const by = coCmp;
+  const all = [...companies.values()];
+  return { anak: all.filter(c => c.type !== 'Sub-Subsidiary').sort(by), cucu: all.filter(c => c.type === 'Sub-Subsidiary').sort(by) };
+};
+// per tahun: periode terakhir (to terbesar) yang berada dalam satu tahun kalender
+function coYears(c) {
+  const out = new Map();
+  coLrOf(c.id).forEach(d => {
+    const y = String(d.to).slice(0, 4); if (String(d.from).slice(0, 4) !== y) return;
+    const cur = out.get(y); if (!cur || d.to > cur.d.to) out.set(y, { d, ...lrM(d) });
+  });
+  return out;
+}
+const coYearList = () => [...new Set([...companies.values()].flatMap(c => [...coYears(c).keys()]))].sort((a, b) => b.localeCompare(a));
+const MON3 = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+function buildConsol(Y) {
+  const g = coOrdered(), P = Y - 1;
+  const mk = c => {
+    const ys = coYears(c), a = ys.get(String(Y)), b = ys.get(String(P));
+    return { c, ys, name: c.name, target: (Number(c.target) || 0) / 1e6, o: a ? a.omset / 1e6 : null, n: a ? a.net / 1e6 : null, po: b ? b.omset / 1e6 : null, pn: b ? b.net / 1e6 : null };
+  };
+  const anak = g.anak.map(mk), cucu = g.cucu.map(mk), all = [...anak, ...cucu];
+  if (!all.length) return null;
+  const ysAll = all.flatMap(x => [...x.ys.keys()].map(Number));
+  if (!ysAll.length) return null;
+  const minY = Math.min(...ysAll);
+  const years = [Y - 3, Y - 2, Y - 1, Y].filter(y => y >= minY);
+  const yAgg = list => ({ o: years.map(y => list.reduce((a, x) => a + ((x.ys.get(String(y)) || {}).omset || 0) / 1e6, 0)), n: years.map(y => list.reduce((a, x) => a + ((x.ys.get(String(y)) || {}).net || 0) / 1e6, 0)) });
+  const sum = (list, k) => list.reduce((a, x) => a + (x[k] || 0), 0);
+  const tot = (list, name) => ({ name, total: true, target: sum(list, 'target'), o: sum(list, 'o'), n: sum(list, 'n'), po: sum(list, 'po'), pn: sum(list, 'pn') });
+  // label periode tahun berjalan, mis. "(Jan–Okt)"; kosong bila satu tahun penuh
+  let latest = null;
+  all.forEach(x => { const e = x.ys.get(String(Y)); if (e && (!latest || e.d.to > latest.to)) latest = e.d; });
+  let label = '';
+  if (latest) {
+    const fm = +latest.from.slice(5, 7), tm = +latest.to.slice(5, 7);
+    if (!(fm === 1 && tm === 12)) label = '(' + MON3[fm - 1] + (fm === tm ? '' : '–' + MON3[tm - 1]) + ')';
+  }
+  return { Y, P, anak, cucu, all, years, label, yAnak: yAgg(anak), yCucu: yAgg(cucu), tAnak: anak.length ? tot(anak, 'Total Anak') : null, tCucu: cucu.length ? tot(cucu, 'Total Cucu') : null };
+}
+function niceScale(lo, hi, n = 5) {
+  if (lo > 0) lo = 0; if (hi < 0) hi = 0; if (hi === lo) hi = lo + 1;
+  const raw = (hi - lo) / n, p = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / p;
+  const step = (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p;
+  return { lo: Math.floor(lo / step + 1e-9) * step, hi: Math.ceil(hi / step - 1e-9) * step, step };
+}
+async function renderConsol(Y, SC) {
+  const D = buildConsol(Y); if (!D) return null;
+  const logo = await rpLogoP, P = D.P, lab = D.label;
+  const W = 1000, S = SC || 2, PX = 40, CW = 920, FF = 'Arial, Helvetica, sans-serif', GOLD = '#B8923C', INK = '#111', RED = '#B3261E', GRID = '#ECE7DC', TOT = '#E9D9A8';
+  const all = D.all, n = all.length;
+  const tblRows = D.anak.length + (D.tAnak ? 1 : 0) + D.cucu.length + (D.tCucu ? 1 : 0);
+  const hS1 = 270, hS2 = 250, hS3 = 250;
+  const H = 182 + 72 + 34 + hS1 + 28 + 2 * (hS2 + 28) + hS3 + 28 + (26 + 30 + tblRows * 28) + 36;
+  const c = document.createElement('canvas'); c.width = W * S; c.height = Math.ceil(H * S);
+  const ctx = c.getContext('2d'); ctx.scale(S, S); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+  const J = v => { const r = Math.round(v); return (r === 0 ? 0 : r).toLocaleString('id-ID'); };
+  // kartu ringkasan (nilai dalam jutaan): omset dibulatkan ke Miliar, net 1 desimal; di bawah 1 Miliar tampil Juta
+  const kJt = v => 'Rp' + J(v) + ' Juta';
+  const kOm = v => { v = Number(v) || 0; return Math.abs(v) >= 1000 ? (v < 0 ? '-' : '') + 'Rp' + Math.round(Math.abs(v) / 1000).toLocaleString('id-ID') + 'M' : kJt(v); };
+  const kNt = v => { v = Number(v) || 0; return Math.abs(v) >= 1000 ? (v < 0 ? '-' : '') + 'Rp' + (Math.abs(v) / 1000).toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + 'M' : kJt(v); };
+  // label grafik (nilai dalam jutaan): >= 1 Miliar -> Rp113,9M ; di bawahnya -> Rp808jt
+  const gFmt = (v, minD) => { v = Number(v) || 0; const a = Math.abs(v), sg = v < 0 ? '-' : ''; return a >= 1000 ? sg + 'Rp' + (a / 1000).toLocaleString('id-ID', { minimumFractionDigits: minD, maximumFractionDigits: 1 }) + 'M' : sg + 'Rp' + Math.round(a).toLocaleString('id-ID') + 'jt'; };
+  const G = v => gFmt(v, 1), GA = v => (Math.round(v) === 0 ? 'Rp0' : gFmt(v, 0));
+  const np = (nn, oo) => (oo ? nn / oo * 100 : null);
+  const fp = v => v == null ? '-' : v.toFixed(2).replace('.', ',') + '%';
+  const T = (t, x, y, font, col, al) => { ctx.font = font; ctx.fillStyle = col; ctx.textAlign = al || 'left'; ctx.textBaseline = 'middle'; ctx.fillText(t, x, y); };
+  const R = (x, y, w, h, col) => { ctx.fillStyle = col; ctx.fillRect(x, y, w, h); };
+  const RR = (x, y, w, h, r, fill, stroke) => { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 1; ctx.stroke(); } };
+  const fit = (t, maxW, font) => { ctx.font = font; t = String(t); if (ctx.measureText(t).width <= maxW) return t; while (t.length > 1 && ctx.measureText(t + '…').width > maxW) t = t.slice(0, -1); return t + '…'; };
+  // latar & kop
+  R(0, 0, W, H, '#F8F6F1'); R(0, 0, W, 146, '#fff'); R(0, 0, W, 10, INK);
+  if (logo) { let lh = 62, lw = lh * logo.width / logo.height; if (lw > 300) { lw = 300; lh = lw * logo.height / logo.width; } ctx.drawImage(logo, PX, 40 + (62 - lh) / 2, lw, lh); }
+  T('LAPORAN KONSOLIDASI ' + Y, W - PX, 52, 'bold 30px ' + FF, INK, 'right');
+  T('Anak & Cucu Perusahaan  |  Dalam jutaan Rupiah', W - PX, 100, 'bold 14px ' + FF, GOLD, 'right');
+  R(0, 140, W, 6, GOLD);
+  // kartu ringkasan
+  const ta = D.tAnak, tc = D.tCucu;
+  const kp = [
+    ['Omset Anak ' + Y, ta ? kOm(ta.o) : '-', P + ': ' + (ta ? kOm(ta.po) : '-'), INK],
+    ['Net Anak ' + Y, ta ? kNt(ta.n) : '-', 'NPM ' + fp(ta ? np(ta.n, ta.o) : null), GOLD],
+    ['Omset Cucu ' + Y, tc ? kOm(tc.o) : '-', P + ': ' + (tc ? kOm(tc.po) : '-'), INK],
+    ['Net Cucu ' + Y, tc ? kNt(tc.n) : '-', 'NPM ' + fp(tc ? np(tc.n, tc.o) : null), GOLD]
+  ];
+  const kw = (CW - 3 * 18) / 4;
+  kp.forEach(([l, v, s, col], i) => {
+    const x = PX + i * (kw + 18), y = 182;
+    RR(x, y, kw, 72, 8, '#fff', '#EBDDB0'); R(x, y + 3, 4, 66, GOLD);
+    T(l, x + 16, y + 17, '12px ' + FF, '#666'); T(v, x + 16, y + 42, 'bold 26px ' + FF, col); T(s, x + 16, y + 61, '11px ' + FF, '#777');
+  });
+  // ---- grafik tahunan (Omset, Net & NPM) ----
+  const yearChart = (x, y, w, h, title, ag) => {
+    T(title, x, y + 8, 'bold 14px ' + FF, INK);
+    const bt = y + 26, bh = h - 26; R(x, bt, w, bh, '#fff');
+    const pl = 56, pr = 12, pt = 58, pb = 38, px = x + pl, py = bt + pt, pw = w - pl - pr, ph = bh - pt - pb;
+    const sc = niceScale(Math.min(0, ...ag.n, ...ag.o), Math.max(0, ...ag.o, ...ag.n));
+    const sy = v => py + ph - (v - sc.lo) / (sc.hi - sc.lo) * ph;
+    for (let v = sc.lo; v <= sc.hi + 1e-9; v += sc.step) { R(px, sy(v), pw, 1, v === 0 ? '#bbb' : GRID); T(GA(v), px - 6, sy(v), '10px ' + FF, '#777', 'right'); }
+    const gw = pw / D.years.length, bw = Math.min(gw * 0.32, 46);
+    D.years.forEach((yr, i) => {
+      const cx = px + gw * (i + 0.5);
+      [[cx - bw - 1, ag.o[i], INK, false], [cx + 1, ag.n[i], GOLD, true]].forEach(([bx, v, col, gold]) => {
+        const y0 = sy(0), y1 = sy(v);
+        R(bx, Math.min(y0, y1), bw, Math.max(Math.abs(y1 - y0), 0), col);
+        if (Math.round(v) !== 0) T(G(v), bx + bw / 2, v >= 0 ? y1 - 7 : y1 + 7, (gold ? 'bold ' : '') + '9px ' + FF, gold ? GOLD : '#222', 'center');
+      });
+      const nm = np(ag.n[i], ag.o[i]);
+      if (nm != null) { RR(cx - 38, bt + 8, 76, 17, 3, '#FBE4E2'); T('NPM ' + fp(nm), cx, bt + 16.5, 'bold 10px ' + FF, RED, 'center'); }
+      T(String(yr), cx, py + ph + 14, '10px ' + FF, '#555', 'center');
+      if (yr === Y && lab) T(lab, cx, py + ph + 26, '10px ' + FF, '#555', 'center');
+    });
+    R(x + 8, bt + 32, 10, 10, INK); T('Omset', x + 23, bt + 37, '10px ' + FF, '#222');
+    R(x + 66, bt + 32, 10, 10, GOLD); T('Net', x + 81, bt + 37, '10px ' + FF, '#222');
+  };
+  let y = 182 + 72 + 34;
+  yearChart(PX, y, 440, hS1, 'Anak Perusahaan: Omset, Net & NPM', D.yAnak);
+  yearChart(PX + 480, y, 440, hS1, 'Cucu Perusahaan: Omset, Net & NPM', D.yCucu);
+  y += hS1 + 28;
+  // ---- grafik batang vertikal per perusahaan (Omset & Net Profit) ----
+  const vFrame = (title, vals) => {
+    T(title, PX, y + 8, 'bold 14px ' + FF, INK);
+    const bt = y + 26, bh = hS2 - 26; R(PX, bt, CW, bh, '#fff');
+    const pl = 56, pr = 16, pt = 30, pb = 30, px = PX + pl, py = bt + pt, pw = CW - pl - pr, ph = bh - pt - pb;
+    const sc = niceScale(Math.min(0, ...vals), Math.max(0, ...vals));
+    const sy = v => py + ph - (v - sc.lo) / (sc.hi - sc.lo) * ph, gw = pw / n;
+    for (let v = sc.lo; v <= sc.hi + 1e-9; v += sc.step) { R(px, sy(v), pw, 1, v === 0 ? INK : GRID); T(GA(v), px - 6, sy(v), '10px ' + FF, '#777', 'right'); }
+    all.forEach((co, i) => T(fit(co.name, gw - 6, '10px ' + FF), px + gw * (i + 0.5), py + ph + 14, '10px ' + FF, '#666', 'center'));
+    return { px, py, pw, ph, sy, gw, bt, bh };
+  };
+  const o1 = vFrame('Omset per Perusahaan: ' + P + ' vs ' + Y + (lab ? ' ' + lab : ''), [...all.map(x => x.po || 0), ...all.map(x => x.o || 0)]);
+  all.forEach((co, i) => {
+    const cx = o1.px + o1.gw * (i + 0.5), bw = Math.min(o1.gw * 0.28, 34), y0 = o1.sy(0);
+    if (co.po != null) { const y1 = o1.sy(co.po); R(cx - bw - 1, Math.min(y0, y1), bw, Math.abs(y1 - y0), '#E8D5A8'); }
+    if (co.o != null) { const y1 = o1.sy(co.o); R(cx + 1, Math.min(y0, y1), bw, Math.abs(y1 - y0), INK); T(G(co.o), cx + 1 + bw / 2, co.o >= 0 ? y1 - 9 : y1 + 9, 'bold 9px ' + FF, '#222', 'center'); }
+  });
+  R(PX + 8, o1.bt + 9, 9, 9, '#E8D5A8'); T(String(P), PX + 22, o1.bt + 13.5, '10px ' + FF, '#444');
+  R(PX + 64, o1.bt + 9, 9, 9, INK); T(String(Y), PX + 78, o1.bt + 13.5, '10px ' + FF, '#444');
+  y += hS2 + 28;
+  const n1 = vFrame('Net Profit ' + Y + (lab ? ' ' + lab : '') + ' per Perusahaan', all.map(x => x.n || 0));
+  all.forEach((co, i) => {
+    if (co.n == null) return;
+    const cx = n1.px + n1.gw * (i + 0.5), bw = Math.min(n1.gw * 0.5, 72), y0 = n1.sy(0), y1 = n1.sy(co.n);
+    R(cx - bw / 2, Math.min(y0, y1), bw, Math.abs(y1 - y0), co.n < 0 ? RED : GOLD);
+    T(G(co.n), cx, co.n >= 0 ? y1 - 9 : y1 + 9, 'bold 10px ' + FF, '#222', 'center');
+  });
+  y += hS2 + 28;
+  // ---- NPM per perusahaan ----
+  T('NPM ' + Y + (lab ? ' ' + lab : '') + ' per Perusahaan (%)', PX, y + 8, 'bold 14px ' + FF, INK);
+  {
+    const bt = y + 26, bh = hS3 - 26; R(PX, bt, CW, bh, '#fff');
+    const CAP = 60, vals = all.map(x => np(x.n, x.o)), clipped = vals.map(v => v == null ? 0 : Math.max(-CAP, Math.min(CAP, v)));
+    const notes = all.map((x, i) => vals[i] != null && Math.abs(vals[i]) > CAP ? '*' + x.name + ' dipotong di ' + (vals[i] < 0 ? '-' : '') + CAP + '% pada grafik (nilai sebenarnya ' + fp(vals[i]) + ')' : null).filter(Boolean);
+    const pl = 44, pr = 16, pt = 22, pb = 30 + notes.length * 12, px = PX + pl, py = bt + pt, pw = CW - pl - pr, ph = bh - pt - pb;
+    const sc = niceScale(Math.min(0, ...clipped) * 1.15, Math.max(0, ...clipped) * 1.15);
+    const sy = v => py + ph - (v - sc.lo) / (sc.hi - sc.lo) * ph;
+    for (let v = sc.lo; v <= sc.hi + 1e-9; v += sc.step) { R(px, sy(v), pw, 1, v === 0 ? INK : GRID); T(String(Math.round(v)), px - 6, sy(v), '10px ' + FF, '#777', 'right'); }
+    const gw = pw / n, bw = Math.min(gw * 0.5, 72);
+    all.forEach((co, i) => {
+      const cx = px + gw * (i + 0.5);
+      if (vals[i] != null) {
+        const y0 = sy(0), y1 = sy(clipped[i]);
+        R(cx - bw / 2, Math.min(y0, y1), bw, Math.abs(y1 - y0), vals[i] < 0 ? RED : GOLD);
+        T(fp(vals[i]), cx, vals[i] >= 0 ? y1 - 9 : y1 + 9, 'bold 10px ' + FF, '#222', 'center');
+      }
+      T(fit(co.name, gw - 6, '10px ' + FF), cx, py + ph + 14, '10px ' + FF, '#666', 'center');
+    });
+    notes.forEach((t, i) => T(t, PX + CW - 10, bt + bh - 8 - (notes.length - 1 - i) * 12, '9px ' + FF, '#777', 'right'));
+  }
+  y += hS3 + 28;
+  // ---- tabel ringkasan ----
+  T('Ringkasan Data (dalam jutaan Rupiah)', PX, y + 8, 'bold 14px ' + FF, INK);
+  y += 26;
+  const cw0 = 130, cwn = (CW - cw0) / 8, xs = [PX, ...Array.from({ length: 8 }, (_, i) => PX + cw0 + cwn * i)], RH = 28;
+  const heads = ['Perusahaan', 'Omset ' + P, 'Net ' + P, 'NPM ' + P, 'Target Omset', 'Omset ' + Y, '% Capaian', 'Net ' + Y, 'NPM ' + Y];
+  R(PX, y, CW, 30, INK);
+  heads.forEach((h, i) => i ? T(h, xs[i] + cwn / 2, y + 15, 'bold 11px ' + FF, GOLD, 'center') : T(h, xs[0] + 10, y + 15, 'bold 11px ' + FF, GOLD));
+  y += 30;
+  const trs = [...D.anak, ...(D.tAnak ? [D.tAnak] : []), ...D.cucu, ...(D.tCucu ? [D.tCucu] : [])];
+  trs.forEach(r => {
+    R(PX, y, CW, RH, r.total ? TOT : '#fff');
+    const cells = [r.name, r.po == null ? '-' : J(r.po), r.pn == null ? '-' : J(r.pn), r.po == null ? '-' : fp(np(r.pn, r.po)),
+      r.target > 0 ? J(r.target) : '', r.o == null ? '-' : J(r.o), r.target > 0 && r.o != null ? fp(np(r.o, r.target)) : '',
+      r.n == null ? '-' : J(r.n), r.o == null ? '-' : fp(np(r.n, r.o))];
+    const neg = [false, false, r.pn < 0, r.pn < 0 && r.po, false, false, false, r.n < 0, r.n < 0 && r.o];
+    cells.forEach((t, i) => {
+      const red = neg[i] && i > 0, f = (r.total || red ? 'bold ' : '') + '11px ' + FF;
+      if (i === 0) T(fit(t, cw0 - 16, f), xs[0] + 10, y + RH / 2, f, INK); else T(t, xs[i] + cwn / 2, y + RH / 2, f, red ? RED : '#222', 'center');
+    });
+    R(PX, y + RH - 1, CW, 1, '#E3DCCB'); y += RH;
+  });
+  for (let i = 0; i <= 8; i++) R(xs[i] - 0.5, y - trs.length * RH, 1, trs.length * RH, '#E3DCCB');
+  R(PX + CW - 1, y - trs.length * RH, 1, trs.length * RH, '#E3DCCB');
+  return c;
+}
+let coTok = 0;
+async function updateCoPreview() {
+  const img = $('#coImg'); if (!img) return;
+  const tok = ++coTok, Y = +$('#coYear').value;
+  try { const c = await renderConsol(Y); if (tok === coTok && $('#coImg')) $('#coImg').src = c ? c.toDataURL('image/png') : ''; }
+  catch (err) { console.error(err); }
+}
 
 /* ================= Service worker ================= */
 if ('serviceWorker' in navigator) {
